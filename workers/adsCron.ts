@@ -1,16 +1,13 @@
-/**
- * Ads scraping cron worker
- *
- * Run this on Railway as a persistent service with a cron schedule.
- * Railway cron: set "Cron Schedule" to "0 */5 * * *" (every 5 hours)
- *
- * Usage:
- *   node --require tsx/cjs workers/adsCron.ts
- *
- * Required env:
- *   DATABASE_URL, DIRECT_URL, NEXT_PUBLIC_SUPABASE_URL,
- *   NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
- */
+// Ads scraping cron worker
+// Run this on Railway as a persistent service with a cron schedule.
+// Railway cron: set "Cron Schedule" to "0 0/5 * * *" (every 5 hours)
+//
+// Usage:
+//   node_modules/.bin/tsx --tsconfig tsconfig.worker.json workers/adsCron.ts
+//
+// Required env:
+//   DATABASE_URL, DIRECT_URL, NEXT_PUBLIC_SUPABASE_URL,
+//   NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
 
 import { prisma } from '@/lib/prisma'
 import { scrapeMultipleBrands } from '@/lib/scraping/ads'
