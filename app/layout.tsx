@@ -28,7 +28,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider>
+    <ClerkProvider afterSignOutUrl="/sign-in">
       <html lang="fr">
         <head>
           {/* Synchronous theme init — prevents flash of wrong theme in dashboard */}

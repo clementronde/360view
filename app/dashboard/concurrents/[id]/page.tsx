@@ -40,18 +40,19 @@ async function getOrgForUser(userId: string) {
   return prisma.organization.findFirst({ where: { clerkOrgId: userId } })
 }
 
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   return { title: 'Détail concurrent' }
 }
 
-export default async function CompetitorDetailPage({ params }: { params: { id: string } }) {
+export default async function CompetitorDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const { userId } = await auth()
   if (!userId) notFound()
 
   const org = await getOrgForUser(userId)
   if (!org) notFound()
 
-  const competitor = await getCompetitorWithData(params.id, org.id)
+  const competitor = await getCompetitorWithData(id, org.id)
   if (!competitor) notFound()
 
   return (

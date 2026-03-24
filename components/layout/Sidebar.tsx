@@ -203,7 +203,7 @@ export function Sidebar({ plan }: SidebarProps) {
             collapsed && 'justify-center px-0'
           )}
         >
-          <UserButton afterSignOutUrl="/sign-in" />
+          <UserButton />
           {!collapsed && (
             <span className="text-xs text-muted-foreground truncate">Mon compte</span>
           )}

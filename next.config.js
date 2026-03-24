@@ -15,9 +15,7 @@ const nextConfig = {
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 31536000, // 1 an — images immutables
   },
-  experimental: {
-    serverComponentsExternalPackages: ['playwright', '@prisma/client'],
-  },
+  serverExternalPackages: ['playwright', '@prisma/client'],
 }
 
 module.exports = nextConfig
