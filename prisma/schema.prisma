@@ -70,11 +70,14 @@ model Organization {
   slug       String   @unique
   plan       Plan     @default(FREE)
   logoUrl    String?
+  alertEmail     String?  // override destination for alert emails (defaults to Clerk account email)
+  weeklyDigest   Boolean  @default(false) // send weekly summary email every Monday
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   competitors  Competitor[]
   activities   Activity[]
+  savedAds     SavedAd[]
 
   @@map("organizations")
 }
@@ -104,6 +107,11 @@ model Competitor {
   trackSms    Boolean @default(false)
   trackSeo    Boolean @default(true)
   trackLlm    Boolean @default(false)
+
+  // Alert toggles — email sent when a new event is detected
+  alertNewAds  Boolean @default(false)
+  alertSeoChange Boolean @default(false)
+  alertLlmChange Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -141,6 +149,23 @@ model Ad {
   isStale        Boolean    @default(false)
   rawData        Json?
 
+  // Landing page capture — screenshot of the destination URL
+  landingPageImageUrl   String?
+  landingPageCapturedAt DateTime?
+
+  // Deduplication — perceptual hash of the creative image (prevents same creative stored twice)
+  contentHash    String?
+
+  // Geo targeting
+  country        String?    @default("ALL") // ISO 3166-1 alpha-2 e.g. "FR", "US", "ALL"
+
+  // Engagement proxy — derived from platform data when available
+  // Meta: uses impression range midpoint; TikTok: uses Creative Center score
+  engagementScore Float?    // normalized 0-100
+  impressionsMin  Int?      // Meta impression range lower bound
+  impressionsMax  Int?      // Meta impression range upper bound
+  activeDays      Int?      // nb of days the ad has been running (longevity = proxy for performance)
+
   firstSeenAt DateTime @default(now())
   lastSeenAt  DateTime @updatedAt
 
@@ -148,6 +173,11 @@ model Ad {
   @@index([platform])
   @@index([format])
   @@index([source])
+  @@index([country])
+  @@index([contentHash])
+  savedAds     SavedAd[]
+
+  @@index([engagementScore(sort: Desc)])
   @@index([firstSeenAt(sort: Desc)])
   @@map("ads")
 }
@@ -267,4 +297,18 @@ model Activity {
 
   @@index([organizationId])
   @@map("activities")
+}
+
+model SavedAd {
+  id      String @id @default(cuid())
+  orgId   String
+  adId    String
+  savedAt DateTime @default(now())
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  ad           Ad           @relation(fields: [adId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, adId])
+  @@index([orgId])
+  @@map("saved_ads")
 }

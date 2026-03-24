@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { generateTrackingEmail, slugify } from '@/lib/utils'
+import { checkCanAddCompetitor } from '@/actions/plan'
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,10 @@ export async function createCompetitor(formData: z.infer<typeof competitorSchema
   if (!parsed.success) {
     return { error: parsed.error.errors[0].message }
   }
+
+  // Plan quota check
+  const gate = await checkCanAddCompetitor()
+  if (!gate.allowed) return { error: gate.reason ?? 'Quota de concurrents atteint' }
 
   const org = await getOrCreateOrg(userId)
   const data = parsed.data
@@ -121,7 +126,7 @@ export async function updateCompetitor(
 
   try {
     const updated = await prisma.competitor.update({
-      where: { id },
+      where: { id, organizationId: org.id },
       data: {
         ...formData,
         trackingEmail,
@@ -153,7 +158,7 @@ export async function deleteCompetitor(id: string) {
   if (!existing) return { error: 'Concurrent introuvable' }
 
   try {
-    await prisma.competitor.delete({ where: { id } })
+    await prisma.competitor.delete({ where: { id, organizationId: org.id } })
     revalidatePath('/dashboard/concurrents')
     revalidatePath('/dashboard')
     return { success: true }
@@ -179,7 +184,7 @@ export async function toggleCompetitorActive(id: string, isActive: boolean) {
 
   try {
     await prisma.competitor.update({
-      where: { id },
+      where: { id, organizationId: org.id },
       data: { isActive },
     })
 

@@ -97,7 +97,7 @@ export async function checkSEO(url: string): Promise<SEOData> {
     const response = await fetch(url, {
       headers: {
         'User-Agent':
-          'Mozilla/5.0 (compatible; 360ViewBot/1.0; +https://360view.io/bot)',
+          'Mozilla/5.0 (compatible; SpyMarkBot/1.0; +https://spymark.io/bot)',
         Accept: 'text/html,application/xhtml+xml',
         'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
       },

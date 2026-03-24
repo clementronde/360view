@@ -39,27 +39,23 @@ export function StatsCard({
             )}
             {trend && (
               <p
-                className={cn(
-                  'text-xs font-medium',
-                  trend.positive ? 'text-emerald-400' : 'text-red-400'
-                )}
+                className="text-xs font-medium"
+                style={{ color: trend.positive ? 'var(--success)' : 'var(--destructive)' }}
               >
                 {trend.positive ? '+' : ''}{trend.value}% {trend.label}
               </p>
             )}
           </div>
           <div
-            className={cn(
-              'flex h-10 w-10 items-center justify-center rounded-xl',
-              iconClassName ?? 'bg-primary/15'
-            )}
+            className={cn('flex h-10 w-10 items-center justify-center rounded-lg', iconClassName)}
+            style={!iconClassName ? { background: 'var(--accent-subtle)' } : undefined}
           >
-            <Icon className="h-5 w-5 text-primary" />
+            <Icon className="h-5 w-5" style={{ color: 'var(--accent)' }} />
           </div>
         </div>
       </CardContent>
-      {/* Subtle gradient accent */}
-      <div className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-primary/50 to-transparent" />
+      {/* Left border accent */}
+      <div className="absolute inset-y-0 left-0 w-0.5" style={{ background: 'var(--accent)' }} />
     </Card>
   )
 }

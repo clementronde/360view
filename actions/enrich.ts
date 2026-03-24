@@ -4,13 +4,8 @@ import { auth } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
 import { scrapeMultipleBrands } from '@/lib/scraping/ads'
 import { uploadScreenshot } from '@/lib/supabase'
-
-const SEED_BRANDS = [
-  'Sephora', 'Décathlon', 'IKEA', "McDonald's", 'Zara',
-  'H&M', 'Amazon', 'Fnac', 'Booking.com', 'Renault',
-  "L'Oréal", 'Lacoste', 'Adidas', 'Samsung', 'Carrefour',
-  'Leclerc', 'BNP Paribas', 'Orange', 'Canal+', 'Puma',
-]
+import { ALL_SEED_BRANDS, BRAND_CATEGORIES } from '@/lib/brandCategories'
+import { hashImageBuffer, computeEngagementScore } from '@/lib/adDedup'
 
 async function getOrCreateOrg(userId: string) {
   let org = await prisma.organization.findFirst({ where: { clerkOrgId: userId } })
@@ -22,11 +17,16 @@ async function getOrCreateOrg(userId: string) {
   return org
 }
 
-export async function enrichFeed(count = 2): Promise<{ added: number; brands: string[]; error?: string }> {
+export async function enrichFeed(count = 2, category?: string): Promise<{ added: number; brands: string[]; error?: string }> {
   const { userId } = await auth()
   if (!userId) return { added: 0, brands: [], error: 'Non authentifié' }
 
   const org = await getOrCreateOrg(userId)
+
+  // Use category-specific brands if a filter is active, otherwise all seed brands
+  const pool = category && BRAND_CATEGORIES[category]
+    ? BRAND_CATEGORIES[category].brands
+    : ALL_SEED_BRANDS
 
   // Pick brands not yet scraped for this org
   const existing = await prisma.competitor.findMany({
@@ -34,10 +34,10 @@ export async function enrichFeed(count = 2): Promise<{ added: number; brands: st
     select: { name: true },
   })
   const existingNames = new Set(existing.map((c) => c.name.toLowerCase()))
-  const unseen = SEED_BRANDS.filter((b) => !existingNames.has(b.toLowerCase()))
+  const unseen = pool.filter((b) => !existingNames.has(b.toLowerCase()))
   const toScrape = unseen.length > 0
     ? unseen.slice(0, count)
-    : [...SEED_BRANDS].sort(() => Math.random() - 0.5).slice(0, count)
+    : [...pool].sort(() => Math.random() - 0.5).slice(0, count)
 
   console.log(`[enrichFeed] Scraping: ${toScrape.join(', ')}`)
 
@@ -83,22 +83,39 @@ export async function enrichFeed(count = 2): Promise<{ added: number; brands: st
     const adsWithBuffers = scrapedAds.filter((s) => s.imageBuffer && s.imageFilename)
     console.log(`[enrichFeed] ${brand}: ${scrapedAds.length} scraped, ${adsWithBuffers.length} with image buffer`)
 
-    // Upload images in parallel
+    // ── Deduplicate by content hash BEFORE uploading (saves Storage quota) ───
+    const withHashes = adsWithBuffers.map((scraped) => ({
+      scraped,
+      contentHash: hashImageBuffer(scraped.imageBuffer!),
+    }))
+
+    const candidateHashes = withHashes.map((a) => a.contentHash)
+    const existingHashes = await prisma.ad.findMany({
+      where: { contentHash: { in: candidateHashes } },
+      select: { contentHash: true, id: true },
+    })
+    const existingHashSet = new Set(existingHashes.map((a) => a.contentHash).filter(Boolean) as string[])
+    const deduped = withHashes.filter((a) => !existingHashSet.has(a.contentHash))
+
+    console.log(`[enrichFeed] ${brand}: ${deduped.length}/${adsWithBuffers.length} after dedup`)
+    if (deduped.length === 0) continue
+
+    // Upload images in parallel (only non-duplicates)
     const adsWithImages = await Promise.all(
-      adsWithBuffers.map(async (scraped) => {
+      deduped.map(async ({ scraped, contentHash }) => {
         const uploaded = await uploadScreenshot(scraped.imageBuffer!, scraped.imageFilename!)
         if (!uploaded) console.warn(`[enrichFeed] Upload failed for ${scraped.imageFilename}`)
-        return uploaded ? { scraped, imageUrl: uploaded.url, imageKey: uploaded.key } : null
+        return uploaded ? { scraped, imageUrl: uploaded.url, imageKey: uploaded.key, contentHash } : null
       })
     )
 
     const validAds = adsWithImages.filter(Boolean) as NonNullable<(typeof adsWithImages)[number]>[]
-    console.log(`[enrichFeed] ${brand}: ${validAds.length}/${adsWithBuffers.length} uploads succeeded`)
+    console.log(`[enrichFeed] ${brand}: ${validAds.length}/${deduped.length} uploads succeeded`)
 
     if (validAds.length === 0) continue
 
     await prisma.ad.createMany({
-      data: validAds.map(({ scraped, imageUrl, imageKey }) => ({
+      data: validAds.map(({ scraped, imageUrl, imageKey, contentHash }) => ({
         competitorId: competitor.id,
         platform: scraped.platform,
         format: scraped.format ?? 'DISPLAY',
@@ -111,13 +128,15 @@ export async function enrichFeed(count = 2): Promise<{ added: number; brands: st
         ctaText: scraped.ctaText ?? null,
         landingUrl: scraped.landingUrl ?? null,
         rawData: scraped.rawData as Record<string, string | number | boolean | null> | undefined,
+        contentHash,
+        country: 'FR',
+        activeDays: 1,
+        engagementScore: computeEngagementScore({ activeDays: 1 }),
       })),
-      skipDuplicates: true,
     })
 
-    const addedForBrand = validAds.length
-    totalAdded += addedForBrand
-    if (addedForBrand > 0) brandsWithAds.push(brand)
+    totalAdded += validAds.length
+    if (validAds.length > 0) brandsWithAds.push(brand)
   }
 
   return { added: totalAdded, brands: brandsWithAds }

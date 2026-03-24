@@ -1,15 +1,25 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Inter, JetBrains_Mono } from 'next/font/google'
 import { ClerkProvider } from '@clerk/nextjs'
 import { Toaster } from 'sonner'
 import './globals.css'
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+})
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-jetbrains-mono',
+  display: 'swap',
+})
 
 export const metadata: Metadata = {
   title: {
-    default: '360View — Veille Concurrentielle',
-    template: '%s | 360View',
+    default: 'SpyMark — Veille Concurrentielle',
+    template: '%s | SpyMark',
   },
   description:
     'Plateforme de veille concurrentielle tout-en-un : ads, emails, SMS, SEO et visibilité LLM.',
@@ -19,17 +29,29 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider>
-      <html lang="fr" className="dark">
-        <body className={inter.className}>
+      <html lang="fr">
+        <head>
+          {/* Synchronous theme init — prevents flash of wrong theme in dashboard */}
+          <script dangerouslySetInnerHTML={{ __html: `
+            try {
+              if (window.location.pathname.startsWith('/dashboard')) {
+                var t = localStorage.getItem('spymark-theme');
+                if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                  document.documentElement.classList.add('dark');
+                }
+              }
+            } catch(e) {}
+          `}} />
+        </head>
+        <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans`}>
           {children}
           <Toaster
-            theme="dark"
             position="bottom-right"
             toastOptions={{
               style: {
-                background: 'hsl(222 47% 8%)',
-                border: '1px solid hsl(215 28% 15%)',
-                color: 'hsl(213 31% 91%)',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                color: 'var(--text)',
               },
             }}
           />

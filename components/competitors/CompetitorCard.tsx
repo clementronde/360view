@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { ExternalLink, Image as ImageIcon, Mail, MessageSquare, Search, Brain, MoreHorizontal, Trash2, Power } from 'lucide-react'
 import { toast } from 'sonner'
 import { useTransition } from 'react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -103,9 +102,18 @@ export function CompetitorCard({ competitor }: CompetitorCardProps) {
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          <Badge variant={competitor.isActive ? 'success' : 'secondary'} className="text-xs">
+          <span
+            className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium"
+            style={{
+              fontFamily: 'var(--font-jetbrains-mono)',
+              borderRadius: 3,
+              borderLeft: `2px solid ${competitor.isActive ? 'var(--success)' : 'var(--border)'}`,
+              background: competitor.isActive ? 'color-mix(in srgb, var(--success) 10%, transparent)' : 'var(--surface-muted)',
+              color: competitor.isActive ? 'var(--success)' : 'var(--text-muted)',
+            }}
+          >
             {competitor.isActive ? 'Actif' : 'Pausé'}
-          </Badge>
+          </span>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
@@ -145,11 +153,16 @@ export function CompetitorCard({ competitor }: CompetitorCardProps) {
         {modules.filter((m) => m.enabled).map((mod) => (
           <div
             key={mod.label}
-            className="flex items-center gap-1 rounded-md bg-muted/40 px-2 py-1"
+            className="flex items-center gap-1 px-2 py-1"
+            style={{
+              borderRadius: 3,
+              border: '1px solid var(--border)',
+              background: 'var(--surface-muted)',
+            }}
           >
-            <mod.icon className="h-3 w-3 text-muted-foreground" />
-            <span className="text-xs font-medium">{mod.count}</span>
-            <span className="text-xs text-muted-foreground">{mod.label}</span>
+            <mod.icon className="h-3 w-3" style={{ color: 'var(--text-muted)' }} />
+            <span className="text-xs font-medium" style={{ fontFamily: 'var(--font-jetbrains-mono)', color: 'var(--text)' }}>{mod.count}</span>
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{mod.label}</span>
           </div>
         ))}
       </div>

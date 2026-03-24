@@ -9,6 +9,8 @@ const nextConfig = {
       },
       { protocol: 'https', hostname: 'img.clerk.com' },
       { protocol: 'https', hostname: 'www.google.com' },
+      { protocol: 'https', hostname: 'picsum.photos' },
+      { protocol: 'https', hostname: 'fastly.picsum.photos' },
     ],
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 31536000, // 1 an — images immutables

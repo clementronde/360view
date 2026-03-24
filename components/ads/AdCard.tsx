@@ -3,8 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import { ExternalLink, X, ZoomIn } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { PLATFORM_LABELS, PLATFORM_COLORS, formatRelative, getFaviconUrl } from '@/lib/utils'
+import { PLATFORM_LABELS, formatRelative, getFaviconUrl } from '@/lib/utils'
 
 export interface AdCardProps {
   ad: {
@@ -60,25 +59,41 @@ export function AdCard({ ad }: AdCardProps) {
             unoptimized
           />
 
-          {/* Hover gradient overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-
-          {/* Platform badge */}
+          {/* Platform chip — always visible */}
           <div className="absolute top-2 left-2">
-            <Badge className={`${PLATFORM_COLORS[ad.platform] ?? PLATFORM_COLORS.OTHER} text-[10px] px-1.5 py-0 backdrop-blur-sm`}>
+            <span
+              className="inline-flex items-center px-1.5 py-0.5 text-[9px] font-medium tracking-[0.06em] uppercase"
+              style={{
+                fontFamily: 'var(--font-jetbrains-mono)',
+                borderRadius: 3,
+                background: 'rgba(0,0,0,0.5)',
+                color: 'rgba(255,255,255,0.85)',
+                backdropFilter: 'blur(4px)',
+              }}
+            >
               {PLATFORM_LABELS[ad.platform] ?? ad.platform}
-            </Badge>
+            </span>
           </div>
 
           {/* Zoom hint — visible on hover */}
-          <div className="absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-full bg-white/10 backdrop-blur-sm text-white border border-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <div className="absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded text-white border border-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200" style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(4px)' }}>
             <ZoomIn className="h-3 w-3" />
           </div>
 
-          {/* CTA pill — visible on hover at bottom */}
+          {/* CTA chip — visible on hover at bottom */}
           {ad.ctaText && (
             <div className="absolute bottom-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-              <span className="inline-flex items-center rounded-full bg-primary/90 backdrop-blur-sm px-2.5 py-0.5 text-[10px] font-semibold text-primary-foreground">
+              <span
+                className="inline-flex items-center px-2 py-0.5 text-[9px] font-semibold tracking-[0.06em] uppercase"
+                style={{
+                  fontFamily: 'var(--font-jetbrains-mono)',
+                  borderRadius: 3,
+                  borderLeft: '2px solid var(--accent)',
+                  background: 'rgba(79,110,247,0.85)',
+                  color: '#fff',
+                  backdropFilter: 'blur(4px)',
+                }}
+              >
                 {ad.ctaText}
               </span>
             </div>
@@ -170,15 +185,23 @@ export function AdCard({ ad }: AdCardProps) {
                 </div>
               </div>
 
-              {/* Platform badge */}
-              <Badge className={`${PLATFORM_COLORS[ad.platform] ?? PLATFORM_COLORS.OTHER} self-start`}>
+              {/* Platform chip */}
+              <span
+                className="inline-flex items-center self-start px-2 py-1 text-[10px] font-medium tracking-[0.06em] uppercase"
+                style={{
+                  fontFamily: 'var(--font-jetbrains-mono)',
+                  borderRadius: 3,
+                  background: 'var(--accent-subtle)',
+                  color: 'var(--accent)',
+                }}
+              >
                 {PLATFORM_LABELS[ad.platform] ?? ad.platform}
-              </Badge>
+              </span>
 
               {/* Title */}
               {ad.title && (
                 <div>
-                  <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Titre</p>
+                  <p className="text-[10px] uppercase tracking-[0.1em] mb-1" style={{ fontFamily: 'var(--font-jetbrains-mono)', color: 'var(--text-muted)' }}>Titre</p>
                   <p className="text-sm font-medium leading-snug">{ad.title}</p>
                 </div>
               )}
@@ -186,16 +209,24 @@ export function AdCard({ ad }: AdCardProps) {
               {/* Description */}
               {ad.description && (
                 <div>
-                  <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Description</p>
-                  <p className="text-sm text-muted-foreground leading-relaxed">{ad.description}</p>
+                  <p className="text-[10px] uppercase tracking-[0.1em] mb-1" style={{ fontFamily: 'var(--font-jetbrains-mono)', color: 'var(--text-muted)' }}>Description</p>
+                  <p className="text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>{ad.description}</p>
                 </div>
               )}
 
               {/* CTA */}
               {ad.ctaText && (
                 <div>
-                  <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">CTA</p>
-                  <span className="inline-flex items-center rounded-full bg-primary/10 border border-primary/30 px-3 py-1 text-xs font-semibold text-primary">
+                  <p className="text-[10px] uppercase tracking-[0.1em] mb-1" style={{ fontFamily: 'var(--font-jetbrains-mono)', color: 'var(--text-muted)' }}>CTA</p>
+                  <span
+                    className="inline-flex items-center px-3 py-1 text-xs font-medium"
+                    style={{
+                      borderLeft: '2px solid var(--accent)',
+                      background: 'var(--accent-subtle)',
+                      color: 'var(--accent)',
+                      borderRadius: '0 3px 3px 0',
+                    }}
+                  >
                     {ad.ctaText}
                   </span>
                 </div>

@@ -2,87 +2,152 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    --background: 224 71% 4%;
-    --foreground: 213 31% 91%;
-
-    --card: 222 47% 8%;
-    --card-foreground: 213 31% 91%;
-
-    --popover: 222 47% 8%;
-    --popover-foreground: 213 31% 91%;
-
-    --primary: 263 70% 58%;
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 222 47% 12%;
-    --secondary-foreground: 213 31% 91%;
-
-    --muted: 222 47% 11%;
-    --muted-foreground: 215 20% 55%;
-
-    --accent: 222 47% 14%;
-    --accent-foreground: 213 31% 91%;
-
-    --destructive: 0 63% 55%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 215 28% 15%;
-    --input: 215 28% 15%;
-    --ring: 263 70% 58%;
-
-    --radius: 0.625rem;
-  }
+html, body {
+  overflow-x: hidden;
 }
 
 @layer base {
+  :root {
+    /* ── Design tokens — Light mode ── */
+    --bg:             #FAFAF8;
+    --surface:        #FFFFFF;
+    --surface-muted:  #F4F3F0;
+    --border:         #E8E6E1;
+    --text:           #111110;
+    --text-muted:     #6F6C66;
+    --accent:         #4F6EF7;
+    --accent-hover:   #3D59D9;
+    --accent-subtle:  #EEF1FE;
+    --success:        #1A7A52;
+    --changed:        #C2410C;
+    --destructive:    #D94B3A;
+
+    /* Shadcn compat aliases (used by UI components) */
+    --background:           var(--bg);
+    --foreground:           var(--text);
+    --card:                 var(--surface);
+    --card-foreground:      var(--text);
+    --popover:              var(--surface);
+    --popover-foreground:   var(--text);
+    --primary:              var(--accent);
+    --primary-foreground:   #ffffff;
+    --secondary:            var(--surface-muted);
+    --secondary-foreground: var(--text);
+    --muted:                var(--surface-muted);
+    --muted-foreground:     var(--text-muted);
+    --accent-shadcn:        var(--surface-muted);
+    --accent-foreground:    var(--text);
+    --destructive-shadcn:   var(--destructive);
+    --destructive-foreground: #ffffff;
+    --input:                var(--border);
+    --ring:                 var(--accent);
+    --radius:               0.5rem;
+  }
+
+  .dark {
+    /* ── Design tokens — Dark mode ── */
+    --bg:             #0D0F14;
+    --surface:        #13161D;
+    --surface-muted:  #1A1E27;
+    --border:         #242835;
+    --text:           #E8E6E1;
+    --text-muted:     #6F7280;
+    --accent:         #4F6EF7;
+    --accent-hover:   #6B84F9;
+    --accent-subtle:  #1A1F3A;
+    --success:        #22A06B;
+    --changed:        #EA580C;
+    --destructive:    #E05545;
+
+    /* Shadcn compat aliases */
+    --background:           var(--bg);
+    --foreground:           var(--text);
+    --card:                 var(--surface);
+    --card-foreground:      var(--text);
+    --popover:              var(--surface);
+    --popover-foreground:   var(--text);
+    --primary:              var(--accent);
+    --primary-foreground:   #ffffff;
+    --secondary:            var(--surface-muted);
+    --secondary-foreground: var(--text);
+    --muted:                var(--surface-muted);
+    --muted-foreground:     var(--text-muted);
+    --accent-shadcn:        var(--surface-muted);
+    --accent-foreground:    var(--text);
+    --destructive-shadcn:   var(--destructive);
+    --destructive-foreground: #ffffff;
+    --input:                var(--border);
+    --ring:                 var(--accent);
+  }
+
   * {
-    @apply border-border;
+    border-color: var(--border);
   }
 
   body {
-    @apply bg-background text-foreground;
+    background-color: var(--bg);
+    color: var(--text);
     font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   /* Custom scrollbar */
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); opacity: 0.3; }
+}
 
-  ::-webkit-scrollbar-track {
-    @apply bg-transparent;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    @apply bg-border rounded-full;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/30;
-  }
+/* ── Marquee scroll-driven ── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 @layer utilities {
-  .gradient-text {
-    @apply bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent;
-  }
+  /* Border indicators — replace pill badges */
+  .border-l-accent   { border-left: 3px solid var(--accent); }
+  .border-l-changed  { border-left: 3px solid var(--changed); }
+  .border-l-success  { border-left: 3px solid var(--success); }
+  .border-l-neutral  { border-left: 3px solid var(--border); }
 
-  .glass-card {
-    @apply bg-card/50 backdrop-blur-sm border border-border/50;
-  }
-
+  /* Sidebar items */
   .sidebar-item {
-    @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150;
+    @apply flex items-center gap-2 px-2 py-1.5 rounded text-sm font-medium transition-all duration-150;
+    border-left: 2px solid transparent;
+    margin-left: -2px;
+    color: var(--text-muted);
   }
-
+  .sidebar-item:hover {
+    background-color: var(--surface-muted);
+    color: var(--text);
+  }
   .sidebar-item-active {
-    @apply bg-primary/15 text-primary border border-primary/20;
+    border-left-color: var(--accent);
+    background-color: var(--surface-muted);
+    color: var(--text);
   }
 
-  .sidebar-item-inactive {
-    @apply text-muted-foreground hover:text-foreground hover:bg-accent;
+  /* Reduced motion — stoppe toutes les animations CSS */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    .marquee-track {
+      transform: none !important;
+      transition: none !important;
+    }
+  }
+
+  .animate-fade-up {
+    animation: fade-up 0.6s ease forwards;
+  }
+
+  /* Landing page navbar — semi-opaque + blur */
+  .lp-nav {
+    background-color: color-mix(in srgb, var(--bg) 85%, transparent);
   }
 }

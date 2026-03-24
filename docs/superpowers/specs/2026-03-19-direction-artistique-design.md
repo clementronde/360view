@@ -1,4 +1,4 @@
-# Direction Artistique — 360View
+# Direction Artistique — SpyMark
 **Date :** 2026-03-19
 **Statut :** Approuvé
 
@@ -6,7 +6,7 @@
 
 ## Contexte
 
-360View est un SaaS B2B de veille concurrentielle automatisée (publicités, emails, SMS, SEO, LLM). L'objectif de cette refonte est de sortir d'un rendu "fait par l'IA" pour adopter une vraie direction artistique premium, cohérente entre la Landing Page et l'application.
+SpyMark est un SaaS B2B de veille concurrentielle automatisée (publicités, emails, SMS, SEO, LLM). L'objectif de cette refonte est de sortir d'un rendu "fait par l'IA" pour adopter une vraie direction artistique premium, cohérente entre la Landing Page et l'application.
 
 ---
 
@@ -43,7 +43,7 @@
 
 ### Dark mode (toggle)
 
-Activé par la classe `.dark` sur `<html>`. Persisté en `localStorage` sous la clé `"360view-theme"`. Fallback sur `prefers-color-scheme: dark` si aucune valeur stockée.
+Activé par la classe `.dark` sur `<html>`. Persisté en `localStorage` sous la clé `"spymark-theme"`. Fallback sur `prefers-color-scheme: dark` si aucune valeur stockée.
 
 | Token CSS | Valeur hex dark |
 |-----------|----------------|
@@ -110,7 +110,7 @@ Structure :
       <circle cx="7" cy="7" r="6" stroke="white" stroke-width="1.5" fill="none"/>
     </svg>
   </div>
-  <span>360View</span>           <!-- Inter 700, 16px, --text -->
+  <span>SpyMark</span>           <!-- Inter 700, 16px, --text -->
 </div>
 ```
 
@@ -219,7 +219,7 @@ Max-width contenu : `1100px`. Padding horizontal : `48px`.
 - Contenu : Logo gauche / Links centre / CTAs droite
 - Links : `Fonctionnalités`, `Comment ça marche`, `Tarifs` — Inter 500 14px `--text-muted`
 - CTAs : `btn-ghost` "Se connecter" + `btn-primary` "Essai gratuit"
-- **Theme toggle** : icône soleil/lune, coin droit de la navbar. `localStorage.setItem('360view-theme', 'dark'/'light')`.
+- **Theme toggle** : icône soleil/lune, coin droit de la navbar. `localStorage.setItem('spymark-theme', 'dark'/'light')`.
 
 ---
 
@@ -236,7 +236,7 @@ Max-width contenu : `1100px`. Padding horizontal : `48px`.
   à le savoir.
   ```
 - Body (Inter 400 / 16px / `--text-muted`) :
-  > "360View surveille automatiquement les publicités, emails, SMS, SEO et visibilité LLM de vos concurrents — et vous alerte en temps réel."
+  > "SpyMark surveille automatiquement les publicités, emails, SMS, SEO et visibilité LLM de vos concurrents — et vous alerte en temps réel."
 - CTAs : `btn-primary btn-lg` "Commencer gratuitement" + `btn-outline btn-lg` "Voir une démo"
 
 **Colonne droite — App window mockup :**
@@ -246,7 +246,7 @@ Composant statique simulant une fenêtre d'application (pas de screenshot, pas d
 Structure :
 ```
 ┌─────────────────────────────────┐
-│ ● ● ●  360view.app/dashboard   │  ← barre de titre (--surface-muted)
+│ ● ● ●  spymark.app/dashboard   │  ← barre de titre (--surface-muted)
 ├─────────────────────────────────┤
 │ [barre indigo] Publicités·META  │  Nike lance 3 nouvelles annonces  12min │
 │ [barre verte]  Score LLM·ChatGPT│  Adidas — 78% (+12%)              1h   │

@@ -15,10 +15,15 @@ import {
   ChevronRight,
   Eye,
   Compass,
+  CalendarDays,
+  Zap,
+  Bookmark,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
 import { UserButton } from '@clerk/nextjs'
+import type { Plan } from '@prisma/client'
+import { PLAN_LABELS } from '@/lib/planLimits'
 
 const NAV_ITEMS = [
   {
@@ -31,6 +36,11 @@ const NAV_ITEMS = [
     href: '/dashboard/feed',
     label: 'Découvrir',
     icon: Compass,
+  },
+  {
+    href: '/dashboard/swipe-file',
+    label: 'Swipe File',
+    icon: Bookmark,
   },
   {
     href: '/dashboard/concurrents',
@@ -62,9 +72,25 @@ const NAV_ITEMS = [
     label: 'LLM Visibility',
     icon: Brain,
   },
+  {
+    href: '/dashboard/calendar',
+    label: 'Calendrier',
+    icon: CalendarDays,
+  },
 ]
 
-export function Sidebar() {
+const PLAN_BADGE_STYLE: Record<Plan, { bg: string; color: string }> = {
+  FREE:       { bg: 'var(--surface-muted)', color: 'var(--text-muted)' },
+  STARTER:    { bg: 'rgba(59,130,246,0.15)', color: '#3b82f6' },
+  PRO:        { bg: 'var(--accent-subtle)', color: 'var(--accent)' },
+  ENTERPRISE: { bg: 'rgba(245,158,11,0.15)', color: '#f59e0b' },
+}
+
+interface SidebarProps {
+  plan: Plan
+}
+
+export function Sidebar({ plan }: SidebarProps) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
 
@@ -72,6 +98,9 @@ export function Sidebar() {
     if (exact) return pathname === href
     return pathname.startsWith(href)
   }
+
+  const badgeStyle = PLAN_BADGE_STYLE[plan]
+  const showUpgrade = plan === 'FREE' || plan === 'STARTER'
 
   return (
     <aside
@@ -87,11 +116,11 @@ export function Sidebar() {
           collapsed ? 'justify-center' : 'gap-2'
         )}
       >
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/20">
-          <Eye className="h-4 w-4 text-primary" />
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg" style={{ background: 'var(--accent-subtle)' }}>
+          <Eye className="h-4 w-4" style={{ color: 'var(--accent)' }} />
         </div>
         {!collapsed && (
-          <span className="text-sm font-bold gradient-text">360View</span>
+          <span className="text-sm font-bold" style={{ color: 'var(--text)' }}>SpyMark</span>
         )}
       </div>
 
@@ -105,7 +134,7 @@ export function Sidebar() {
               href={item.href}
               className={cn(
                 'sidebar-item',
-                active ? 'sidebar-item-active' : 'sidebar-item-inactive',
+                active && 'sidebar-item-active',
                 collapsed && 'justify-center px-0'
               )}
               title={collapsed ? item.label : undefined}
@@ -119,10 +148,47 @@ export function Sidebar() {
 
       {/* Bottom section */}
       <div className="border-t border-border p-2">
+
+        {/* Plan badge + upgrade CTA */}
+        {!collapsed && (
+          <Link
+            href="/dashboard/upgrade"
+            className="flex items-center justify-between gap-2 rounded-xl px-3 py-2 mb-2 transition-colors hover:bg-muted/40"
+          >
+            <div className="flex items-center gap-2">
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold tracking-[0.06em] uppercase"
+                style={{ fontFamily: 'var(--font-jetbrains-mono)', background: badgeStyle.bg, color: badgeStyle.color }}
+              >
+                {PLAN_LABELS[plan]}
+              </span>
+            </div>
+            {showUpgrade && (
+              <span
+                className="inline-flex items-center gap-0.5 text-[10px] font-semibold shrink-0"
+                style={{ color: 'var(--accent)' }}
+              >
+                <Zap className="h-3 w-3" />
+                Upgrader
+              </span>
+            )}
+          </Link>
+        )}
+
+        {collapsed && showUpgrade && (
+          <Link
+            href="/dashboard/upgrade"
+            className="sidebar-item justify-center px-0 mb-2"
+            title="Upgrader votre plan"
+          >
+            <Zap className="h-4 w-4" style={{ color: 'var(--accent)' }} />
+          </Link>
+        )}
+
         <Link
           href="/dashboard/settings"
           className={cn(
-            'sidebar-item sidebar-item-inactive mb-2',
+            'sidebar-item mb-2',
             collapsed && 'justify-center px-0'
           )}
           title={collapsed ? 'Paramètres' : undefined}

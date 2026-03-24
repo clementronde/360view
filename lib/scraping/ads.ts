@@ -420,6 +420,463 @@ async function scrapeTikTokWithBrowser(
   return ads
 }
 
+// ─── Meta Ad Library — by Facebook Page ID ───────────────────────────────────
+// Uses the exact page-specific URL from the Ad Library (more accurate than keyword search)
+
+export async function scrapeMetaAdLibraryByPageId(
+  brandName: string,
+  pageId: string
+): Promise<ScrapedAd[]> {
+  const { chromium } = await import('playwright')
+  const browser = await chromium.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+  })
+  try {
+    return await scrapeMetaAdLibraryByPageIdWithBrowser(browser, brandName, pageId)
+  } finally {
+    await browser.close()
+  }
+}
+
+async function scrapeMetaAdLibraryByPageIdWithBrowser(
+  browser: import('playwright').Browser,
+  brandName: string,
+  pageId: string
+): Promise<ScrapedAd[]> {
+  const context = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    locale: 'fr-FR',
+    viewport: { width: 1440, height: 900 },
+    extraHTTPHeaders: { 'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8' },
+  })
+  const page = await context.newPage()
+
+  // Intercept all fbcdn/scontent images — real ad creatives are filtered by file size later.
+  // We don't filter by path prefix because Facebook uses different paths across regions/versions.
+  // Exclude only explicit small-size URL markers (profile pics, icons, sprites).
+  const interceptedImageUrls = new Set<string>()
+  page.on('response', (response) => {
+    const url = response.url()
+    const ct = response.headers()['content-type'] ?? ''
+    if (
+      response.status() === 200 &&
+      ct.startsWith('image/') &&
+      (url.includes('fbcdn') || url.includes('scontent')) &&
+      !url.includes('p40x40') && !url.includes('p50x50') &&
+      !url.includes('p80x80') && !url.includes('s32x32') &&
+      !url.includes('s60x60') && !url.includes('s80x80') &&
+      !url.includes('p20x20') && !url.includes('p24x24') &&
+      !url.includes('p36x36') && !url.includes('emoji') &&
+      !url.includes('/rsrc.php')  // UI sprites/icons
+    ) {
+      interceptedImageUrls.add(url)
+    }
+  })
+
+  const ads: ScrapedAd[] = []
+
+  // Helper: navigate to a media_type URL, scroll to load lazy images, collect DOM srcs
+  async function scrapeMediaType(mediaType: 'image' | 'meme') {
+    const url = `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&media_type=${mediaType}&search_type=page&sort_data[mode]=total_impressions&sort_data[direction]=desc&view_all_page_id=${pageId}`
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 })
+
+    // Cookie consent only needed on first navigation
+    if (mediaType === 'image') {
+      const cookieSelectors = [
+        'button[data-testid="cookie-policy-manage-dialog-accept-button"]',
+        'button:has-text("Allow all cookies")',
+        'button:has-text("Autoriser tous les cookies")',
+        'button:has-text("Accept all")',
+        'button:has-text("Accepter tout")',
+        '[aria-label="Allow all cookies"]',
+        'div[role="dialog"] button:last-child',
+      ]
+      for (const sel of cookieSelectors) {
+        try { await page.click(sel, { timeout: 3000 }); await page.waitForTimeout(1000); break } catch { /* next */ }
+      }
+    }
+
+    await page.waitForTimeout(4000)
+    for (let i = 0; i < 8; i++) {
+      await page.evaluate(() => window.scrollBy(0, 1000))
+      await page.waitForTimeout(900)
+    }
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await page.waitForTimeout(600)
+    for (let i = 0; i < 4; i++) {
+      await page.evaluate(() => window.scrollBy(0, 1200))
+      await page.waitForTimeout(700)
+    }
+
+    // Collect DOM images (catches any missed by the response listener)
+    const domUrls: string[] = await page.evaluate(() => {
+      const isSmall = (src: string) =>
+        src.includes('p40x40') || src.includes('p50x50') || src.includes('p80x80') ||
+        src.includes('s32x32') || src.includes('s60x60') || src.includes('s80x80') ||
+        src.includes('p20x20') || src.includes('p24x24') || src.includes('p36x36') ||
+        src.includes('emoji') || src.includes('/rsrc.php')
+      return Array.from(document.querySelectorAll('img'))
+        .map(img => img.src || img.getAttribute('src') || '')
+        .filter(src => src.length > 0 && (src.includes('fbcdn') || src.includes('scontent')) && !isSmall(src))
+        .filter((src, i, arr) => arr.indexOf(src) === i)
+    })
+    return { url, domUrls }
+  }
+
+  try {
+    console.log(`[Scraper Meta/PageId] "${brandName}" (${pageId})`)
+
+    // ── Pass 1: image ads ─────────────────────────────────────────────────────
+    const { url: imageUrl, domUrls: imageDomUrls } = await scrapeMediaType('image')
+
+    // ── Pass 2: meme/GIF ads (same session, cookie already accepted) ──────────
+    const { url: memeUrl, domUrls: memeDomUrls } = await scrapeMediaType('meme')
+
+    // Merge all sources, deduplicate
+    const domAll = imageDomUrls.concat(memeDomUrls)
+    const merged = Array.from(interceptedImageUrls).concat(domAll)
+    const allImageUrls = merged.filter((src, i) => merged.indexOf(src) === i).slice(0, 60)
+    console.log(`[Scraper Meta/PageId] "${brandName}": ${allImageUrls.length} images (${interceptedImageUrls.size} intercepted + ${domAll.length} DOM)`)
+
+    if (allImageUrls.length === 0) {
+      // Last resort: screenshot visible ad cards
+      const cardHandles = await page.$$('[data-testid="ad-card"], [role="article"], ._7jyr')
+      console.log(`[Scraper Meta/PageId] "${brandName}": fallback — ${cardHandles.length} cards to screenshot`)
+      await Promise.allSettled(
+        cardHandles.slice(0, 15).map(async (card, i) => {
+          try {
+            const imageBuffer = Buffer.from(await card.screenshot({ type: 'jpeg', quality: 80 }))
+            if (imageBuffer.length < 5000) return
+            ads.push({
+              platform: 'META',
+              format: 'DISPLAY',
+              title: brandName,
+              imageBuffer,
+              imageFilename: `meta-${slugify(brandName)}-${Date.now()}-card${i}.jpg`,
+              landingUrl: imageUrl,
+              rawData: { source: 'meta-ad-library-page-screenshot', brandName, pageId },
+            })
+          } catch { /* skip */ }
+        })
+      )
+    } else {
+      await Promise.allSettled(
+        allImageUrls.map(async (imgUrl, i) => {
+          try {
+            const res = await context.request.get(imgUrl, { timeout: 10000 })
+            if (!res.ok()) return
+            const imageBuffer = Buffer.from(await res.body())
+            if (imageBuffer.length < 15_000) return // skip icons/logos
+            ads.push({
+              platform: 'META',
+              format: 'DISPLAY',
+              title: brandName,
+              imageBuffer,
+              imageFilename: `meta-${slugify(brandName)}-${Date.now()}-${i}.jpg`,
+              landingUrl: imageUrl,
+              rawData: { source: 'meta-ad-library-page', brandName, pageId },
+            })
+          } catch { /* skip */ }
+        })
+      )
+    }
+
+    console.log(`[Scraper Meta/PageId] "${brandName}": ${ads.length} ads saved`)
+  } catch (err) {
+    console.error(`[Scraper Meta/PageId] Failed for "${brandName}" (${pageId}):`, err)
+  } finally {
+    await context.close()
+  }
+
+  return ads
+}
+
+// ─── Meta Ad Library — search by name then scrape official page (single browser session) ──────
+
+/**
+ * Searches the Meta Ad Library for a brand by name, picks the first matching page,
+ * then scrapes ads from that official page — all in a single browser session.
+ * More reliable than calling searchMetaPages + scrapeMetaAdLibraryByPageId separately.
+ */
+export async function scrapeMetaAdLibraryByBrandSearch(
+  brandName: string,
+  searchQuery: string
+): Promise<ScrapedAd[]> {
+  const { chromium } = await import('playwright')
+  const browser = await chromium.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+  })
+  const context = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    locale: 'fr-FR',
+    viewport: { width: 1440, height: 900 },
+    extraHTTPHeaders: { 'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8' },
+  })
+  const page = await context.newPage()
+  const ads: ScrapedAd[] = []
+
+  // Intercept ad images early
+  const interceptedImageUrls = new Set<string>()
+  page.on('response', (response) => {
+    const url = response.url()
+    const ct = response.headers()['content-type'] ?? ''
+    if (
+      response.status() === 200 &&
+      ct.startsWith('image/') &&
+      (url.includes('fbcdn') || url.includes('scontent')) &&
+      !url.includes('p40x40') && !url.includes('p50x50') &&
+      !url.includes('p80x80') && !url.includes('s32x32') &&
+      !url.includes('s60x60') && !url.includes('s80x80') &&
+      !url.includes('p20x20') && !url.includes('p24x24') &&
+      !url.includes('p36x36') && !url.includes('emoji') &&
+      !url.includes('/rsrc.php')
+    ) {
+      interceptedImageUrls.add(url)
+    }
+  })
+
+  try {
+    // Step 1: search for the official brand page
+    const searchUrl = `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&q=${encodeURIComponent(searchQuery)}&search_type=page_like_and_ads_published`
+    await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 40000 })
+
+    // Handle cookie consent
+    const cookieSelectors = [
+      'button[data-testid="cookie-policy-manage-dialog-accept-button"]',
+      'button:has-text("Allow all cookies")',
+      'button:has-text("Autoriser tous les cookies")',
+      'button:has-text("Accept all")',
+      'button:has-text("Accepter tout")',
+      '[aria-label="Allow all cookies"]',
+      'div[role="dialog"] button:last-child',
+    ]
+    for (const sel of cookieSelectors) {
+      try { await page.click(sel, { timeout: 2500 }); await page.waitForTimeout(800); break } catch { /* next */ }
+    }
+
+    await page.waitForTimeout(4000)
+
+    // Step 2: extract page_id from raw HTML — Facebook embeds it as JSON in the page source
+    // Facebook always redirects to keyword_unordered in headless mode, so we parse the JSON data
+    const pageId = await page.evaluate(() => {
+      const html = document.documentElement.innerHTML
+
+      // Extract all page_id values and pick the most common one (= the official brand page)
+      const re = /"page_id":"(\d{8,17})"/g
+      const matches: string[] = []
+      let m: RegExpExecArray | null
+      // eslint-disable-next-line no-cond-assign
+      while ((m = re.exec(html)) !== null) matches.push(m[1])
+      if (matches.length === 0) return null
+
+      // Count occurrences — the official page will appear on every ad card
+      const freq: Record<string, number> = {}
+      for (const id of matches) freq[id] = (freq[id] ?? 0) + 1
+      const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1])
+      return sorted[0][0]
+    })
+
+    if (!pageId) {
+      console.log(`[Scraper Meta/BrandSearch] No page_id found in HTML for "${brandName}"`)
+      return []
+    }
+    console.log(`[Scraper Meta/BrandSearch] "${brandName}" → pageId ${pageId}, navigating to page ads`)
+
+    // Helper: navigate to a media_type, scroll, collect DOM image srcs
+    const collectForMediaType = async (mediaType: 'image' | 'meme') => {
+      const url = `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&media_type=${mediaType}&search_type=page&view_all_page_id=${pageId}`
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 40000 })
+      await page.waitForTimeout(4000)
+      for (let i = 0; i < 8; i++) { await page.evaluate(() => window.scrollBy(0, 1000)); await page.waitForTimeout(900) }
+      await page.evaluate(() => window.scrollTo(0, 0))
+      await page.waitForTimeout(600)
+      for (let i = 0; i < 4; i++) { await page.evaluate(() => window.scrollBy(0, 1200)); await page.waitForTimeout(700) }
+      const domUrls: string[] = await page.evaluate(() => {
+        const isSmall = (src: string) =>
+          src.includes('p40x40') || src.includes('p50x50') || src.includes('p80x80') ||
+          src.includes('s32x32') || src.includes('s60x60') || src.includes('s80x80') ||
+          src.includes('p20x20') || src.includes('p24x24') || src.includes('p36x36') ||
+          src.includes('emoji') || src.includes('/rsrc.php')
+        return Array.from(document.querySelectorAll('img'))
+          .map(img => img.src || img.getAttribute('src') || '')
+          .filter(src => src.length > 0 && (src.includes('fbcdn') || src.includes('scontent')) && !isSmall(src))
+          .filter((src, i, arr) => arr.indexOf(src) === i)
+      })
+      return { url, domUrls }
+    }
+
+    // Step 3: image pass
+    const { url: imageLibUrl, domUrls: imageDomUrls } = await collectForMediaType('image')
+    // Step 4: meme/GIF pass (same browser session, cookie already accepted)
+    const { domUrls: memeDomUrls } = await collectForMediaType('meme')
+
+    const domAll = imageDomUrls.concat(memeDomUrls)
+    const merged = Array.from(interceptedImageUrls).concat(domAll)
+    const allImageUrls = merged.filter((src, i) => merged.indexOf(src) === i).slice(0, 60)
+    console.log(`[Scraper Meta/BrandSearch] "${brandName}": ${allImageUrls.length} images (${interceptedImageUrls.size} intercepted + ${domAll.length} DOM)`)
+
+    // Step 5: fallback — screenshot ad cards if no images captured
+    if (allImageUrls.length === 0) {
+      const cardHandles = await page.$$('[data-testid="ad-card"], [role="article"], ._7jyr')
+      console.log(`[Scraper Meta/BrandSearch] "${brandName}": fallback — ${cardHandles.length} cards to screenshot`)
+      await Promise.allSettled(
+        cardHandles.slice(0, 15).map(async (card, i) => {
+          try {
+            const imageBuffer = Buffer.from(await card.screenshot({ type: 'jpeg', quality: 80 }))
+            if (imageBuffer.length < 5000) return
+            ads.push({
+              platform: 'META',
+              format: 'DISPLAY',
+              title: brandName,
+              imageBuffer,
+              imageFilename: `meta-${slugify(brandName)}-${Date.now()}-card${i}.jpg`,
+              landingUrl: imageLibUrl,
+              rawData: { source: 'meta-ad-library-brand-search-screenshot', brandName, pageId },
+            })
+          } catch { /* skip */ }
+        })
+      )
+    } else {
+      await Promise.allSettled(
+        allImageUrls.map(async (imgUrl, i) => {
+          try {
+            const res = await context.request.get(imgUrl, { timeout: 10000 })
+            if (!res.ok()) return
+            const imageBuffer = Buffer.from(await res.body())
+            if (imageBuffer.length < 15_000) return
+            ads.push({
+              platform: 'META',
+              format: 'DISPLAY',
+              title: brandName,
+              imageBuffer,
+              imageFilename: `meta-${slugify(brandName)}-${Date.now()}-${i}.jpg`,
+              landingUrl: imageLibUrl,
+              rawData: { source: 'meta-ad-library-brand-search', brandName, pageId },
+            })
+          } catch { /* skip */ }
+        })
+      )
+    }
+
+    console.log(`[Scraper Meta/BrandSearch] "${brandName}": ${ads.length} ads saved`)
+  } catch (err) {
+    console.error(`[Scraper Meta/BrandSearch] Failed for "${brandName}":`, err)
+  } finally {
+    await context.close()
+    await browser.close()
+  }
+
+  return ads
+}
+
+// ─── Meta Ad Library — by brand name (keyword search) ────────────────────────
+
+export async function scrapeMetaAdsByName(brandName: string): Promise<ScrapedAd[]> {
+  const { chromium } = await import('playwright')
+  const browser = await chromium.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+  })
+  const context = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    locale: 'fr-FR',
+    viewport: { width: 1440, height: 900 },
+    extraHTTPHeaders: { 'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8' },
+  })
+  const page = await context.newPage()
+
+  const interceptedImageUrls = new Set<string>()
+  page.on('response', (response) => {
+    const url = response.url()
+    const ct = response.headers()['content-type'] ?? ''
+    if (
+      response.status() === 200 &&
+      ct.startsWith('image/') &&
+      (url.includes('fbcdn') || url.includes('scontent')) &&
+      !url.includes('p40x40') && !url.includes('p50x50') &&
+      !url.includes('p80x80') && !url.includes('s32x32') &&
+      !url.includes('s60x60') && !url.includes('s80x80') &&
+      !url.includes('p20x20') && !url.includes('p24x24') &&
+      !url.includes('p36x36') && !url.includes('emoji') &&
+      !url.includes('/rsrc.php')
+    ) {
+      interceptedImageUrls.add(url)
+    }
+  })
+
+  const ads: ScrapedAd[] = []
+  try {
+    const searchUrl = `https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=FR&media_type=image&q=${encodeURIComponent(brandName)}&search_type=page_like_and_ads_published&sort_data[direction]=desc&sort_data[mode]=total_impressions`
+    await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 40000 })
+
+    // Handle cookie consent
+    const cookieSelectors = [
+      'button[data-testid="cookie-policy-manage-dialog-accept-button"]',
+      'button:has-text("Allow all cookies")',
+      'button:has-text("Autoriser tous les cookies")',
+      'button:has-text("Accept all")',
+      'button:has-text("Accepter tout")',
+      '[aria-label="Allow all cookies"]',
+      'div[role="dialog"] button:last-child',
+    ]
+    for (const sel of cookieSelectors) {
+      try { await page.click(sel, { timeout: 2500 }); await page.waitForTimeout(1000); break } catch { /* next */ }
+    }
+
+    await page.waitForTimeout(4000)
+    for (let i = 0; i < 6; i++) {
+      await page.evaluate(() => window.scrollBy(0, 900))
+      await page.waitForTimeout(1000)
+    }
+
+    const domUrls: string[] = await page.evaluate(() => {
+      return Array.from(document.querySelectorAll('img'))
+        .map(img => img.src || '')
+        .filter(src =>
+          src.length > 0 &&
+          (src.includes('fbcdn') || src.includes('scontent')) &&
+          !src.includes('p40x40') && !src.includes('p50x50') &&
+          !src.includes('s32x32') && !src.includes('s60x60') &&
+          !src.includes('emoji') && !src.includes('/rsrc.php')
+        )
+        .filter((src, i, arr) => arr.indexOf(src) === i)
+    })
+
+    const merged = Array.from(interceptedImageUrls).concat(domUrls)
+    const allUrls = merged.filter((src, i) => merged.indexOf(src) === i).slice(0, 40)
+    console.log(`[Scraper Meta/Name] "${brandName}": ${allUrls.length} images`)
+
+    await Promise.allSettled(
+      allUrls.map(async (imgUrl, i) => {
+        try {
+          const res = await context.request.get(imgUrl, { timeout: 10000 })
+          if (!res.ok()) return
+          const imageBuffer = Buffer.from(await res.body())
+          if (imageBuffer.length < 15_000) return
+          ads.push({
+            platform: 'META',
+            format: 'DISPLAY',
+            title: brandName,
+            imageBuffer,
+            imageFilename: `meta-${slugify(brandName)}-${Date.now()}-${i}.jpg`,
+            landingUrl: searchUrl,
+            rawData: { source: 'meta-ad-library-name', brandName },
+          })
+        } catch { /* skip */ }
+      })
+    )
+    console.log(`[Scraper Meta/Name] "${brandName}": ${ads.length} ads saved`)
+  } catch (err) {
+    console.error(`[Scraper Meta/Name] Failed for "${brandName}":`, err)
+  } finally {
+    await context.close()
+    await browser.close()
+  }
+  return ads
+}
+
 // ─── Meta Ad Library API ───────────────────────────────────────────────────────
 
 export async function scrapeMetaAdLibraryAPI(brandName: string): Promise<ScrapedAd[]> {

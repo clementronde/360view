@@ -1,0 +1,22 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "prisma generate && next build",
+  "installCommand": "npm install",
+  "functions": {
+    "app/api/scraping/**": {
+      "maxDuration": 60
+    },
+    "app/api/llm/**": {
+      "maxDuration": 60
+    },
+    "app/api/digest/**": {
+      "maxDuration": 60
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/digest",
+      "schedule": "0 8 * * 1"
+    }
+  ]
+}

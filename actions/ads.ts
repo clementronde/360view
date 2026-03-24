@@ -9,6 +9,9 @@ export interface FetchAdsOptions {
   platform?: string
   search?: string
   shuffle?: boolean
+  brands?: string[]   // filter by advertiserName (used for category filter)
+  country?: string    // ISO 3166-1 alpha-2 e.g. "FR", "US", "ALL" — undefined = all
+  sortBy?: 'recent' | 'trending' // default: recent
 }
 
 export type FeedAd = {
@@ -22,6 +25,9 @@ export type FeedAd = {
   firstSeenAt: string
   source: string
   advertiserName: string | null
+  country: string | null
+  engagementScore: number | null
+  activeDays: number | null
   competitor: { name: string; website: string; logoUrl: string | null } | null
 }
 
@@ -42,7 +48,17 @@ export async function fetchDiscoveryAds(opts: FetchAdsOptions = {}): Promise<Fet
 
   const where: Prisma.AdWhereInput = {
     imageUrl: { not: null },
-    format: { notIn: ['SHOPPING', 'SEARCH'] },
+    format: 'DISPLAY', // images only — no video, no shopping, no search
+    platform: { not: 'GOOGLE' }, // Google Ads excluded from visual discovery feed
+  }
+
+  // Country filter — skip if "ALL" or undefined
+  if (opts.country && opts.country !== 'ALL') {
+    where.OR = [
+      { country: opts.country },
+      { country: 'ALL' },
+      { country: null },
+    ]
   }
 
   // Platform filter
@@ -50,20 +66,33 @@ export async function fetchDiscoveryAds(opts: FetchAdsOptions = {}): Promise<Fet
     where.platform = opts.platform as Prisma.AdWhereInput['platform']
   }
 
-  // Search filter
-  if (search && search.length > 0) {
-    where.OR = [
-      { title: { contains: search, mode: 'insensitive' } },
-      { description: { contains: search, mode: 'insensitive' } },
-      { advertiserName: { contains: search, mode: 'insensitive' } },
-      { competitor: { name: { contains: search, mode: 'insensitive' } } },
+  // Category/brands filter (takes precedence over text search if provided)
+  if (opts.brands && opts.brands.length > 0) {
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+      { OR: opts.brands.map((b) => ({ advertiserName: { equals: b, mode: 'insensitive' as const } })) },
+    ]
+  } else if (search && search.length > 0) {
+    // Text search filter
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+      {
+        OR: [
+          { title: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+          { advertiserName: { contains: search, mode: 'insensitive' } },
+          { competitor: { name: { contains: search, mode: 'insensitive' } } },
+        ],
+      },
     ]
   }
 
   const randomOffset = shuffle ? Math.floor(Math.random() * 20) : 0
   const orderBy: Prisma.AdOrderByWithRelationInput = shuffle
     ? { id: 'asc' }
-    : { firstSeenAt: 'desc' }
+    : opts.sortBy === 'trending'
+      ? { engagementScore: 'desc' }
+      : { firstSeenAt: 'desc' }
 
   const [rawAds, total] = await Promise.all([
     prisma.ad.findMany({
@@ -82,6 +111,9 @@ export async function fetchDiscoveryAds(opts: FetchAdsOptions = {}): Promise<Fet
         firstSeenAt: true,
         source: true,
         advertiserName: true,
+        country: true,
+        engagementScore: true,
+        activeDays: true,
         competitor: {
           select: { name: true, website: true, logoUrl: true },
         },
@@ -105,6 +137,9 @@ export async function fetchDiscoveryAds(opts: FetchAdsOptions = {}): Promise<Fet
       firstSeenAt: ad.firstSeenAt.toISOString(),
       source: ad.source as string,
       advertiserName: ad.advertiserName,
+      country: ad.country,
+      engagementScore: ad.engagementScore,
+      activeDays: ad.activeDays,
       competitor: ad.competitor,
     }))
 

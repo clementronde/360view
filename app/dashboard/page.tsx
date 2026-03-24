@@ -64,11 +64,11 @@ async function AdsFeed() {
 function EmptyState({ hasAds = false }: { hasAds?: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center py-40 text-center select-none">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted mb-5">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl mb-5" style={{ background: 'var(--surface-muted)' }}>
         {hasAds ? (
-          <Layers className="h-7 w-7 text-muted-foreground/40" />
+          <Layers className="h-7 w-7" style={{ color: 'var(--text-muted)', opacity: 0.5 }} />
         ) : (
-          <ImageIcon className="h-7 w-7 text-muted-foreground/40" />
+          <ImageIcon className="h-7 w-7" style={{ color: 'var(--text-muted)', opacity: 0.5 }} />
         )}
       </div>
       <h3 className="text-sm font-semibold">

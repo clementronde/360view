@@ -53,7 +53,7 @@ export function slugify(text: string): string {
 // ─── Tracking email generator ────────────────────────────────────────────────
 
 export function generateTrackingEmail(competitorName: string, orgSlug: string): string {
-  const domain = process.env.TRACKING_EMAIL_DOMAIN || 'tracking.360view.io'
+  const domain = process.env.TRACKING_EMAIL_DOMAIN || 'tracking.spymark.io'
   const slug = slugify(competitorName)
   return `${orgSlug}-${slug}@${domain}`
 }

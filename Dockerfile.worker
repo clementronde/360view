@@ -1,0 +1,18 @@
+# ── Playwright worker for Railway ──────────────────────────────────────────────
+# Uses the official Playwright image which already has Chromium + all deps
+FROM mcr.microsoft.com/playwright:v1.44.0-jammy
+
+WORKDIR /app
+
+# Install dependencies
+COPY package.json package-lock.json ./
+RUN npm ci --include=dev
+
+# Copy source
+COPY . .
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Run the cron worker
+CMD ["node", "--require", "tsx/cjs", "--tsconfig", "tsconfig.worker.json", "workers/adsCron.ts"]

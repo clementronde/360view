@@ -11,6 +11,7 @@ import {
   Search,
   Brain,
   Copy,
+  Bell,
 } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { Header } from '@/components/layout/Header'
@@ -19,6 +20,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { getFaviconUrl, getDomain, formatDateTime, PLATFORM_LABELS, PLATFORM_COLORS } from '@/lib/utils'
+import { AlertToggles } from '@/components/competitors/AlertToggles'
 import type { Metadata } from 'next'
 
 async function getCompetitorWithData(id: string, orgId: string) {
@@ -116,6 +118,30 @@ export default async function CompetitorDetailPage({ params }: { params: { id: s
                 </div>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Alert preferences */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              Alertes email
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <AlertToggles
+              competitorId={competitor.id}
+              initial={{
+                alertNewAds: competitor.alertNewAds,
+                alertSeoChange: competitor.alertSeoChange,
+                alertLlmChange: competitor.alertLlmChange,
+              }}
+            />
+            <p className="text-[11px] mt-3" style={{ color: 'var(--text-muted)' }}>
+              Les alertes sont envoyées à l&apos;adresse de votre compte.
+              Configurez une adresse différente dans les paramètres.
+            </p>
           </CardContent>
         </Card>
 

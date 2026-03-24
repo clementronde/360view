@@ -13,45 +13,53 @@ const config: Config = {
     container: {
       center: true,
       padding: '2rem',
-      screens: {
-        '2xl': '1400px',
-      },
+      screens: { '2xl': '1400px' },
     },
     extend: {
+      fontFamily: {
+        sans:    ['var(--font-inter)', 'system-ui', 'sans-serif'],
+        mono:    ['var(--font-jetbrains-mono)', 'monospace'],
+        display: ['var(--font-inter)', 'system-ui', 'sans-serif'],
+      },
       colors: {
-        border: 'hsl(var(--border))',
-        input: 'hsl(var(--input))',
-        ring: 'hsl(var(--ring))',
-        background: 'hsl(var(--background))',
-        foreground: 'hsl(var(--foreground))',
-        primary: {
-          DEFAULT: 'hsl(var(--primary))',
-          foreground: 'hsl(var(--primary-foreground))',
-        },
-        secondary: {
-          DEFAULT: 'hsl(var(--secondary))',
-          foreground: 'hsl(var(--secondary-foreground))',
-        },
-        destructive: {
-          DEFAULT: 'hsl(var(--destructive))',
-          foreground: 'hsl(var(--destructive-foreground))',
-        },
-        muted: {
-          DEFAULT: 'hsl(var(--muted))',
-          foreground: 'hsl(var(--muted-foreground))',
-        },
-        accent: {
-          DEFAULT: 'hsl(var(--accent))',
-          foreground: 'hsl(var(--accent-foreground))',
+        /* Design tokens */
+        bg:             'var(--bg)',
+        surface:        'var(--surface)',
+        'surface-muted':'var(--surface-muted)',
+        border:         'var(--border)',
+        text:           'var(--text)',
+        'text-muted':   'var(--text-muted)',
+        accent:         'var(--accent)',
+        'accent-hover': 'var(--accent-hover)',
+        'accent-subtle':'var(--accent-subtle)',
+        success:        'var(--success)',
+        changed:        'var(--changed)',
+        destructive:    'var(--destructive)',
+        /* Shadcn compat */
+        background:     'var(--bg)',
+        foreground:     'var(--text)',
+        card: {
+          DEFAULT:      'var(--surface)',
+          foreground:   'var(--text)',
         },
         popover: {
-          DEFAULT: 'hsl(var(--popover))',
-          foreground: 'hsl(var(--popover-foreground))',
+          DEFAULT:      'var(--surface)',
+          foreground:   'var(--text)',
         },
-        card: {
-          DEFAULT: 'hsl(var(--card))',
-          foreground: 'hsl(var(--card-foreground))',
+        primary: {
+          DEFAULT:      'var(--accent)',
+          foreground:   '#ffffff',
         },
+        secondary: {
+          DEFAULT:      'var(--surface-muted)',
+          foreground:   'var(--text)',
+        },
+        muted: {
+          DEFAULT:      'var(--surface-muted)',
+          foreground:   'var(--text-muted)',
+        },
+        input:          'var(--border)',
+        ring:           'var(--accent)',
       },
       borderRadius: {
         lg: 'var(--radius)',
@@ -61,21 +69,16 @@ const config: Config = {
       keyframes: {
         'accordion-down': {
           from: { height: '0' },
-          to: { height: 'var(--radix-accordion-content-height)' },
+          to:   { height: 'var(--radix-accordion-content-height)' },
         },
         'accordion-up': {
           from: { height: 'var(--radix-accordion-content-height)' },
-          to: { height: '0' },
-        },
-        'pulse-dot': {
-          '0%, 100%': { opacity: '1' },
-          '50%': { opacity: '0.3' },
+          to:   { height: '0' },
         },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
-        'accordion-up': 'accordion-up 0.2s ease-out',
-        'pulse-dot': 'pulse-dot 2s ease-in-out infinite',
+        'accordion-up':   'accordion-up 0.2s ease-out',
       },
     },
   },
