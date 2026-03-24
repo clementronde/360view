@@ -6,6 +6,9 @@
     "app/api/scraping/**": {
       "maxDuration": 60
     },
+    "app/api/scraping/trigger": {
+      "maxDuration": 60
+    },
     "app/api/llm/**": {
       "maxDuration": 60
     },

@@ -18,6 +18,7 @@ import {
   CalendarDays,
   Zap,
   Bookmark,
+  ShieldAlert,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
@@ -188,13 +189,26 @@ export function Sidebar({ plan }: SidebarProps) {
         <Link
           href="/dashboard/settings"
           className={cn(
-            'sidebar-item mb-2',
+            'sidebar-item mb-1',
             collapsed && 'justify-center px-0'
           )}
           title={collapsed ? 'Paramètres' : undefined}
         >
           <Settings className="h-4 w-4 shrink-0" />
           {!collapsed && <span>Paramètres</span>}
+        </Link>
+
+        <Link
+          href="/dashboard/admin"
+          className={cn(
+            'sidebar-item mb-2',
+            isActive('/dashboard/admin') && 'sidebar-item-active',
+            collapsed && 'justify-center px-0'
+          )}
+          title={collapsed ? 'Admin' : undefined}
+        >
+          <ShieldAlert className="h-4 w-4 shrink-0" />
+          {!collapsed && <span className="text-muted-foreground">Admin</span>}
         </Link>
 
         <div

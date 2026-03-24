@@ -1,11 +1,12 @@
-'use server'
-
+import { NextResponse } from 'next/server'
 import { auth } from '@clerk/nextjs/server'
 import { prisma } from '@/lib/prisma'
 import { scrapeMetaAdLibraryAPI } from '@/lib/scraping/ads'
-import { revalidatePath } from 'next/cache'
 import { ALL_POPULAR_BRANDS } from '@/lib/popularBrands'
 import type { AdPlatform, AdFormat } from '@prisma/client'
+
+// 60s timeout — configured in vercel.json
+export const maxDuration = 60
 
 async function getOrCreateOrg(userId: string) {
   let org = await prisma.organization.findFirst({ where: { clerkOrgId: userId } })
@@ -17,27 +18,15 @@ async function getOrCreateOrg(userId: string) {
   return org
 }
 
-async function getOrCreateDiscoveryOrg() {
-  let org = await prisma.organization.findFirst({ where: { clerkOrgId: 'mass_scrape_org' } })
-  if (!org) {
-    org = await prisma.organization.create({
-      data: { clerkOrgId: 'mass_scrape_org', name: 'Discovery Library', slug: 'discovery-library' },
-    })
-  }
-  return org
-}
-
-export async function triggerAdsScraping(): Promise<{
-  success: boolean
-  total: number
-  error?: string
-  mode?: 'competitors' | 'discovery'
-}> {
+export async function POST() {
   const { userId } = await auth()
-  if (!userId) return { success: false, total: 0, error: 'Non authentifié' }
+  if (!userId) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
   if (!process.env.META_ACCESS_TOKEN) {
-    return { success: false, total: 0, error: 'META_ACCESS_TOKEN manquant dans les variables d\'env' }
+    return NextResponse.json(
+      { success: false, total: 0, error: 'META_ACCESS_TOKEN manquant' },
+      { status: 200 }
+    )
   }
 
   const org = await getOrCreateOrg(userId)
@@ -45,7 +34,7 @@ export async function triggerAdsScraping(): Promise<{
     where: { organizationId: org.id, isActive: true, trackAds: true },
   })
 
-  // ── Mode A: user has competitors with trackAds → scrape them in parallel ──
+  // ── Mode A: scrape user's competitors ──────────────────────────────────────
   if (competitors.length > 0) {
     const results = await Promise.allSettled(
       competitors.map(async (competitor) => {
@@ -82,35 +71,34 @@ export async function triggerAdsScraping(): Promise<{
         return added
       })
     )
-    const totalCreated = results.reduce(
+    const total = results.reduce(
       (sum, r) => sum + (r.status === 'fulfilled' ? r.value : 0),
       0
     )
-    if (totalCreated > 0) {
-      revalidatePath('/dashboard/ads')
-      revalidatePath('/dashboard/feed')
-    }
-    return { success: true, total: totalCreated, mode: 'competitors' }
+    return NextResponse.json({ success: true, total, mode: 'competitors' })
   }
 
-  // ── Mode B: no competitors → populate discovery feed (8 random brands, parallel) ──
-  const discoveryOrg = await getOrCreateDiscoveryOrg()
+  // ── Mode B: no competitors → seed discovery feed ──────────────────────────
+  let discoveryOrg = await prisma.organization.findFirst({ where: { clerkOrgId: 'mass_scrape_org' } })
+  if (!discoveryOrg) {
+    discoveryOrg = await prisma.organization.create({
+      data: { clerkOrgId: 'mass_scrape_org', name: 'Discovery Library', slug: 'discovery-library' },
+    })
+  }
 
   const brands = [...ALL_POPULAR_BRANDS]
     .sort(() => Math.random() - 0.5)
-    .slice(0, 8)
+    .slice(0, 12)
     .map((b) => b.name)
 
-  // Fetch all brands in parallel (one HTTP call each — fast)
   const scraped = await Promise.allSettled(
-    brands.map(async (brandName) => {
-      const ads = await scrapeMetaAdLibraryAPI(brandName)
-      return { brandName, ads }
-    })
+    brands.map(async (brandName) => ({
+      brandName,
+      ads: await scrapeMetaAdLibraryAPI(brandName),
+    }))
   )
 
-  let totalCreated = 0
-
+  let total = 0
   for (const result of scraped) {
     if (result.status === 'rejected') continue
     const { brandName, ads } = result.value
@@ -121,22 +109,13 @@ export async function triggerAdsScraping(): Promise<{
     })
     if (!competitor) {
       competitor = await prisma.competitor.create({
-        data: {
-          organizationId: discoveryOrg.id,
-          name: brandName,
-          website: '',
-          brandName: brandName,
-          isActive: false,
-          trackAds: false,
-        },
+        data: { organizationId: discoveryOrg.id, name: brandName, website: '', brandName, isActive: false, trackAds: false },
       })
     }
 
     for (const ad of ads) {
       if (ad.landingUrl) {
-        const exists = await prisma.ad.findFirst({
-          where: { competitorId: competitor.id, landingUrl: ad.landingUrl },
-        })
+        const exists = await prisma.ad.findFirst({ where: { competitorId: competitor.id, landingUrl: ad.landingUrl } })
         if (exists) continue
       }
       await prisma.ad.create({
@@ -157,10 +136,9 @@ export async function triggerAdsScraping(): Promise<{
           engagementScore: 0,
         },
       })
-      totalCreated++
+      total++
     }
   }
 
-  revalidatePath('/dashboard/feed')
-  return { success: true, total: totalCreated, mode: 'discovery' }
+  return NextResponse.json({ success: true, total, mode: 'discovery' })
 }
