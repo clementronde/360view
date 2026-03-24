@@ -15,9 +15,9 @@ COPY prisma ./prisma
 COPY workers ./workers
 COPY lib ./lib
 COPY actions ./actions
-COPY tsconfig.json ./
+COPY tsconfig.json tsconfig.worker.json ./
 
 # 4. Generate Prisma client
 RUN npx prisma generate
 
-CMD ["node_modules/.bin/tsx", "workers/adsCron.ts"]
+CMD ["node_modules/.bin/tsx", "--tsconfig", "tsconfig.worker.json", "workers/adsCron.ts"]
