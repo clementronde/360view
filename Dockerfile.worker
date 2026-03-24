@@ -15,4 +15,4 @@ COPY . .
 RUN npx prisma generate
 
 # Run the cron worker
-CMD ["node", "--require", "tsx/cjs", "--tsconfig", "tsconfig.worker.json", "workers/adsCron.ts"]
+CMD ["node_modules/.bin/tsx", "workers/adsCron.ts"]
