@@ -8,7 +8,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --legacy-peer-deps
 
 # 2. Install tsx separately (needed to run TypeScript worker)
-RUN npm install tsx
+RUN npm install tsx --legacy-peer-deps
 
 # 3. Copy only what the worker needs (not the entire Next.js app)
 COPY prisma ./prisma
