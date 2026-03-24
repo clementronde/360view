@@ -1,18 +1,23 @@
 # ── Playwright worker for Railway ──────────────────────────────────────────────
-# Uses the official Playwright image which already has Chromium + all deps
 FROM mcr.microsoft.com/playwright:v1.44.0-jammy
 
 WORKDIR /app
 
-# Install dependencies
+# 1. Install only production deps (skip React/Next/ESLint devDeps)
 COPY package.json package-lock.json ./
-RUN npm ci --include=dev
+RUN npm ci --omit=dev
 
-# Copy source
-COPY . .
+# 2. Install tsx separately (needed to run TypeScript worker)
+RUN npm install tsx
 
-# Generate Prisma client
+# 3. Copy only what the worker needs (not the entire Next.js app)
+COPY prisma ./prisma
+COPY workers ./workers
+COPY lib ./lib
+COPY actions ./actions
+COPY tsconfig.json ./
+
+# 4. Generate Prisma client
 RUN npx prisma generate
 
-# Run the cron worker
 CMD ["node_modules/.bin/tsx", "workers/adsCron.ts"]
