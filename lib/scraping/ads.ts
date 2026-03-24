@@ -189,7 +189,7 @@ async function scrapeGoogleAdsWithBrowser(
     // Extract data from cards
     const creativeData = await page.evaluate(() => {
       const cards = Array.from(document.querySelectorAll('creative-preview'))
-      return cards.slice(0, 20).map((card) => {
+      return cards.slice(0, 50).map((card) => {
         // Try to get image from shadow DOM too
         const shadowRoot = (card as Element & { shadowRoot: ShadowRoot | null }).shadowRoot
         const img = card.querySelector('img') ?? shadowRoot?.querySelector('img')
@@ -213,7 +213,7 @@ async function scrapeGoogleAdsWithBrowser(
 
     // Screenshot each card
     await Promise.allSettled(
-      cardHandles.slice(0, 20).map(async (card, i) => {
+      cardHandles.slice(0, 50).map(async (card, i) => {
         const data = creativeData[i] ?? {}
 
         // Skip search/shopping ads
