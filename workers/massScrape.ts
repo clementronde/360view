@@ -138,6 +138,33 @@ async function main() {
     process.exit(1)
   }
 
+  // ── 0. Test Meta API with one call and log raw response ──────────────────
+  console.log('[massScrape] Testing Meta Ad Library API...')
+  try {
+    const testUrl = new URL('https://graph.facebook.com/v21.0/ads_archive')
+    testUrl.searchParams.set('access_token', process.env.META_ACCESS_TOKEN!)
+    testUrl.searchParams.set('ad_type', 'ALL')
+    testUrl.searchParams.set('ad_reached_countries', '["FR"]')
+    testUrl.searchParams.set('search_terms', 'Nike')
+    testUrl.searchParams.set('fields', 'id,ad_creative_link_title,ad_creative_bodies,snapshot_url')
+    testUrl.searchParams.set('limit', '3')
+    const res = await fetch(testUrl.toString())
+    const data = await res.json() as Record<string, unknown>
+    if (data.error) {
+      console.error('[massScrape] Meta API error:', JSON.stringify(data.error))
+      console.error('[massScrape] Token may be invalid, expired, or missing ads_read permission.')
+      process.exit(1)
+    }
+    const count = Array.isArray(data.data) ? data.data.length : 0
+    console.log(`[massScrape] Meta API OK — ${count} ads returned for "Nike" test call`)
+    if (count === 0) {
+      console.warn('[massScrape] API returned 0 ads even for Nike — token may lack ads_read scope or app needs review')
+    }
+  } catch (err) {
+    console.error('[massScrape] Meta API unreachable:', err)
+    process.exit(1)
+  }
+
   // ── 1. Load active competitor brand names to exclude ─────────────────────
   const existingCompetitors = await prisma.competitor.findMany({
     where: { isActive: true },
