@@ -111,10 +111,10 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
     <h2
       style={{
         fontFamily: 'var(--font-inter)',
-        fontSize: 36,
+        fontSize: 30,
         fontWeight: 700,
-        lineHeight: 1.1,
-        letterSpacing: '-0.03em',
+        lineHeight: 1.15,
+        letterSpacing: '-0.025em',
         color: 'var(--text)',
         marginBottom: 16,
       }}
@@ -241,7 +241,7 @@ function AdsSection() {
   return (
     <section id="fonctionnalites">
       <div className="mx-auto max-w-[1100px] px-12" style={{ paddingTop: 96, paddingBottom: 96 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 72, alignItems: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '5fr 7fr', gap: 56, alignItems: 'center' }}>
 
           {/* Texte */}
           <div>
@@ -283,7 +283,7 @@ function AdsSection() {
                     position: 'relative',
                     overflow: 'hidden',
                     borderRadius: 10,
-                    height: (i === 0 || i === 4) ? 195 : 145,
+                    height: (i === 0 || i === 4) ? 160 : 120,
                     background: ad.bg,
                     flexShrink: 0,
                   }}
