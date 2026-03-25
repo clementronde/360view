@@ -1,16 +1,16 @@
-# ── Playwright worker for Railway ──────────────────────────────────────────────
-FROM mcr.microsoft.com/playwright:v1.44.0-jammy
+# ── HTTP-only worker for Railway (no Playwright needed) ────────────────────────
+FROM node:22-slim
 
 WORKDIR /app
 
-# 1. Install only production deps (skip React/Next/ESLint devDeps)
+# 1. Install dependencies
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --legacy-peer-deps
 
 # 2. Install tsx separately (needed to run TypeScript worker)
 RUN npm install tsx --legacy-peer-deps
 
-# 3. Copy only what the worker needs (not the entire Next.js app)
+# 3. Copy only what the worker needs
 COPY prisma ./prisma
 COPY workers ./workers
 COPY lib ./lib

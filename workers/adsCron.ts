@@ -1,4 +1,4 @@
-// Ads scraping cron worker
+// Ads scraping cron worker — uses Meta Ad Library HTTP API (no Playwright)
 // Run this on Railway as a persistent service with a cron schedule.
 // Railway cron: set "Cron Schedule" to "0 0/5 * * *" (every 5 hours)
 //
@@ -6,25 +6,40 @@
 //   node_modules/.bin/tsx --tsconfig tsconfig.worker.json workers/adsCron.ts
 //
 // Required env:
-//   DATABASE_URL, DIRECT_URL, NEXT_PUBLIC_SUPABASE_URL,
-//   NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+//   DATABASE_URL, DIRECT_URL, META_ACCESS_TOKEN
 
 import { prisma } from '@/lib/prisma'
-import { scrapeMultipleBrands } from '@/lib/scraping/ads'
-import { uploadAdImage } from '@/lib/supabase'
-import { hashImageBuffer, computeEngagementScore } from '@/lib/adDedup'
+import { scrapeMetaAdLibraryAPI } from '@/lib/scraping/ads'
 import type { AdPlatform, AdFormat } from '@prisma/client'
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
-const BATCH_SIZE = 3          // brands scraped in parallel
-const MAX_BRANDS_PER_RUN = 30 // cap to avoid Railway memory limits
+const BATCH_SIZE = 5          // brands scraped in parallel (HTTP is cheap)
+const MAX_BRANDS_PER_RUN = 50 // cap per run
 const COUNTRIES = ['FR', 'US', 'GB', 'DE'] // rotate by run
+
+// Popular brands to scrape when no competitors are configured
+const POPULAR_BRANDS = [
+  'Nike', 'Adidas', 'Apple', 'Samsung', 'Zara', 'H&M', 'IKEA',
+  'Amazon', 'Netflix', 'Spotify', 'Decathlon', 'Sephora', 'L\'Oreal',
+  'Puma', 'Levi\'s', 'Lacoste', 'New Balance', 'Asics', 'Under Armour',
+  'Lululemon', 'Salomon', 'The North Face', 'Patagonia', 'Uniqlo',
+  'Mango', 'Pull&Bear', 'Bershka', 'Reserved', 'Kiabi',
+  'Fnac', 'Darty', 'Cdiscount', 'Boulanger', 'Leroy Merlin',
+  'BNP Paribas', 'Société Générale', 'Crédit Agricole', 'AXA', 'Allianz',
+  'Free', 'SFR', 'Orange', 'Bouygues Telecom', 'Canal+',
+  'Air France', 'SNCF', 'Renault', 'Peugeot', 'Citroën',
+]
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
   console.log(`[adsCron] Starting run at ${new Date().toISOString()}`)
+
+  if (!process.env.META_ACCESS_TOKEN) {
+    console.error('[adsCron] META_ACCESS_TOKEN is missing. Exiting.')
+    process.exit(1)
+  }
 
   // Pick country for this run (rotate based on hour)
   const hourIndex = new Date().getUTCHours()
@@ -33,6 +48,12 @@ async function main() {
 
   // Acquire scraping lock — prevents concurrent runs from overlapping
   const lockKey = 'ads-scraping-lock'
+  const firstOrg = await prisma.organization.findFirst()
+  if (!firstOrg) {
+    console.log('[adsCron] No organization found. Exiting.')
+    process.exit(0)
+  }
+
   const existingLock = await prisma.activity.findFirst({
     where: {
       type: 'AD_DETECTED',
@@ -46,14 +67,6 @@ async function main() {
     process.exit(0)
   }
 
-  // Write lock
-  // Note: we use a dummy organization for system activities — adjust as needed
-  const firstOrg = await prisma.organization.findFirst()
-  if (!firstOrg) {
-    console.log('[adsCron] No organization found. Exiting.')
-    process.exit(0)
-  }
-
   await prisma.activity.create({
     data: {
       organizationId: firstOrg.id,
@@ -64,68 +77,47 @@ async function main() {
   })
 
   try {
-    // Get brands to scrape — all competitors + discovery advertiser names
+    // Get competitor brands
     const competitors = await prisma.competitor.findMany({
       where: { isActive: true, trackAds: true },
       select: { name: true, brandName: true },
       take: MAX_BRANDS_PER_RUN,
     })
 
-    const brands = [...new Set(
+    const competitorBrands = [...new Set(
       competitors.map(c => c.brandName ?? c.name).filter(Boolean)
     )] as string[]
 
-    if (brands.length === 0) {
-      console.log('[adsCron] No brands to scrape. Exiting.')
-      return
-    }
+    // Fill up with popular brands if not enough competitors
+    const brands = competitorBrands.length >= 10
+      ? competitorBrands.slice(0, MAX_BRANDS_PER_RUN)
+      : [...competitorBrands, ...POPULAR_BRANDS].slice(0, MAX_BRANDS_PER_RUN)
 
-    console.log(`[adsCron] Scraping ${brands.length} brands in batches of ${BATCH_SIZE}`)
+    console.log(`[adsCron] Scraping ${brands.length} brands (${competitorBrands.length} competitors + ${brands.length - competitorBrands.length} popular)`)
 
     let totalAdded = 0
     let totalSkipped = 0
 
-    const results = await scrapeMultipleBrands(brands, BATCH_SIZE)
-
-    for (const [brand, scrapedAds] of results) {
-      for (const ad of scrapedAds) {
-        if (!ad.imageBuffer) continue
-
-        // ── Deduplication by content hash ────────────────────────────────────
-        const contentHash = hashImageBuffer(ad.imageBuffer)
-        const exists = await prisma.ad.findFirst({
-          where: { contentHash },
-          select: { id: true, lastSeenAt: true },
+    // Process in batches
+    for (let i = 0; i < brands.length; i += BATCH_SIZE) {
+      const batch = brands.slice(i, i + BATCH_SIZE)
+      const batchResults = await Promise.allSettled(
+        batch.map(async (brand) => {
+          const ads = await scrapeMetaAdLibraryAPI(brand)
+          return { brand, ads }
         })
+      )
 
-        if (exists) {
-          // Ad already in DB — just update lastSeenAt and activeDays
-          const activeDays = Math.floor(
-            (Date.now() - exists.lastSeenAt.getTime()) / (1000 * 60 * 60 * 24)
-          )
-          await prisma.ad.update({
-            where: { id: exists.id },
-            data: {
-              lastSeenAt: new Date(),
-              activeDays,
-              engagementScore: computeEngagementScore({ activeDays }),
-            },
-          })
-          totalSkipped++
+      for (const result of batchResults) {
+        if (result.status === 'rejected') {
+          console.warn('[adsCron] Batch item failed:', result.reason)
           continue
         }
 
-        // ── Upload image ──────────────────────────────────────────────────────
-        let imageUrl: string | undefined
-        try {
-          const filename = ad.imageFilename ?? `${Date.now()}.jpg`
-          imageUrl = await uploadAdImage(ad.imageBuffer, filename)
-        } catch (err) {
-          console.warn(`[adsCron] Upload failed for ${brand}:`, err)
-          continue
-        }
+        const { brand, ads } = result.value
+        if (ads.length === 0) continue
 
-        // ── Find competitor ───────────────────────────────────────────────────
+        // Find matching competitor
         const competitor = await prisma.competitor.findFirst({
           where: {
             OR: [
@@ -136,43 +128,66 @@ async function main() {
           select: { id: true, organizationId: true },
         })
 
-        // ── Insert ad ─────────────────────────────────────────────────────────
-        await prisma.ad.create({
-          data: {
-            competitorId: competitor?.id ?? null,
-            platform: ad.platform as AdPlatform,
-            format: (ad.format ?? 'DISPLAY') as AdFormat,
-            source: competitor ? 'COMPETITOR_TRACKING' : 'DISCOVERY',
-            advertiserName: brand,
-            title: ad.title,
-            description: ad.description,
-            imageUrl,
-            ctaText: ad.ctaText,
-            landingUrl: ad.landingUrl,
-            rawData: ad.rawData ?? {},
-            contentHash,
-            country,
-            activeDays: 1,
-            engagementScore: 0,
-          },
-        })
+        for (const ad of ads) {
+          // Dedup by landingUrl + advertiserName to avoid re-inserting same ad
+          const dedupeKey = `${brand}::${ad.landingUrl ?? ad.title ?? ''}`
+          const exists = await prisma.ad.findFirst({
+            where: {
+              advertiserName: { equals: brand, mode: 'insensitive' },
+              landingUrl: ad.landingUrl ?? null,
+            },
+            select: { id: true, lastSeenAt: true },
+          })
 
-        // Activity log
-        if (competitor) {
-          await prisma.activity.create({
+          if (exists) {
+            await prisma.ad.update({
+              where: { id: exists.id },
+              data: {
+                lastSeenAt: new Date(),
+                activeDays: Math.floor((Date.now() - exists.lastSeenAt.getTime()) / (1000 * 60 * 60 * 24)),
+              },
+            })
+            totalSkipped++
+            continue
+          }
+
+          await prisma.ad.create({
             data: {
-              organizationId: competitor.organizationId,
-              type: 'AD_DETECTED',
-              title: `Nouvelle pub ${ad.platform} — ${brand}`,
-              description: ad.title ?? undefined,
-              entityId: undefined,
-              competitorName: brand,
+              competitorId: competitor?.id ?? null,
+              platform: ad.platform as AdPlatform,
+              format: (ad.format ?? 'DISPLAY') as AdFormat,
+              source: competitor ? 'COMPETITOR_TRACKING' : 'DISCOVERY',
+              advertiserName: brand,
+              title: ad.title,
+              description: ad.description,
+              imageUrl: null,
+              ctaText: ad.ctaText,
+              landingUrl: ad.landingUrl,
+              rawData: ad.rawData ?? {},
+              contentHash: dedupeKey,
+              country,
+              activeDays: 1,
+              engagementScore: 0,
             },
           })
-        }
 
-        totalAdded++
+          if (competitor) {
+            await prisma.activity.create({
+              data: {
+                organizationId: competitor.organizationId,
+                type: 'AD_DETECTED',
+                title: `Nouvelle pub ${ad.platform} — ${brand}`,
+                description: ad.title ?? undefined,
+                competitorName: brand,
+              },
+            })
+          }
+
+          totalAdded++
+        }
       }
+
+      console.log(`[adsCron] Batch ${Math.floor(i / BATCH_SIZE) + 1}: processed ${batch.length} brands`)
     }
 
     console.log(`[adsCron] Done. Added: ${totalAdded}, Skipped (duplicates): ${totalSkipped}`)

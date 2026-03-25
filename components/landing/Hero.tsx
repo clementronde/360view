@@ -400,10 +400,12 @@ export function Hero({ demoAds }: { demoAds: DemoAdData[] }) {
         style={{ position: 'absolute', inset: 0, zIndex: 0 }}
       >
         <BackgroundGrid ads={demoAds} />
-        {/* Overlay: fade ads so text stays readable */}
-        <div style={{ position: 'absolute', inset: 0, background: 'var(--bg)', opacity: 0.62 }} />
+        {/* Base overlay — dims ads uniformly */}
+        <div style={{ position: 'absolute', inset: 0, background: 'var(--bg)', opacity: 0.68 }} />
+        {/* Radial spotlight — extra dark behind text center */}
+        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 60% 55% at 50% 45%, rgba(0,0,0,0.55) 0%, transparent 100%)', pointerEvents: 'none' }} />
         {/* Top + bottom gradient fades */}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, var(--bg) 0%, transparent 18%, transparent 78%, var(--bg) 100%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, var(--bg) 0%, transparent 15%, transparent 78%, var(--bg) 100%)', pointerEvents: 'none' }} />
       </motion.div>
 
       {/* ── Centered text content ── */}
@@ -456,6 +458,7 @@ export function Hero({ demoAds }: { demoAds: DemoAdData[] }) {
             letterSpacing: '-0.04em',
             color: 'var(--text)',
             marginBottom: 24,
+            textShadow: '0 2px 24px rgba(0,0,0,0.5)',
           }}
         >
           {H1_WORDS.map((word, i) => (
