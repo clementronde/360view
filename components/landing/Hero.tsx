@@ -391,155 +391,129 @@ export function Hero({ demoAds }: { demoAds: DemoAdData[] }) {
   return (
     <section style={{ position: 'relative', overflow: 'hidden', background: 'var(--bg)' }}>
 
-      {/* ── Split layout: text left | ad columns right ── */}
+      {/* ── Full-width background: scrolling ad columns ── */}
+      <motion.div
+        aria-hidden="true"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 1.4, delay: 0.2 }}
+        style={{ position: 'absolute', inset: 0, zIndex: 0 }}
+      >
+        <BackgroundGrid ads={demoAds} />
+        {/* Overlay: fade ads so text stays readable */}
+        <div style={{ position: 'absolute', inset: 0, background: 'var(--bg)', opacity: 0.62 }} />
+        {/* Top + bottom gradient fades */}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, var(--bg) 0%, transparent 18%, transparent 78%, var(--bg) 100%)', pointerEvents: 'none' }} />
+      </motion.div>
+
+      {/* ── Centered text content ── */}
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          maxWidth: 1400,
+          position: 'relative',
+          zIndex: 1,
+          maxWidth: 720,
           margin: '0 auto',
-          minHeight: 680,
+          padding: '120px 24px 80px',
+          textAlign: 'center',
         }}
       >
-        {/* LEFT — text content */}
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            padding: '100px 64px 80px',
-          }}
-        >
-          {/* Eyebrow */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.05 }}
-            className="inline-flex items-center gap-2 mb-8"
-            style={{
-              fontFamily: 'var(--font-jetbrains-mono)',
-              fontSize: 11,
-              fontWeight: 500,
-              textTransform: 'uppercase',
-              letterSpacing: '0.09em',
-              color: 'var(--text-muted)',
-            }}
-          >
-            <span
-              aria-hidden="true"
-              style={{
-                display: 'inline-block',
-                width: 7,
-                height: 7,
-                borderRadius: 9999,
-                background: 'var(--success)',
-                animation: 'pulse-dot 2.4s ease-in-out infinite',
-              }}
-            />
-            Surveillance active — 5 canaux
-          </motion.div>
-
-          {/* H1 */}
-          <h1
-            style={{
-              fontFamily: 'var(--font-inter)',
-              fontSize: 64,
-              fontWeight: 800,
-              lineHeight: 1.08,
-              letterSpacing: '-0.04em',
-              color: 'var(--text)',
-              marginBottom: 24,
-            }}
-          >
-            {H1_WORDS.map((word, i) => (
-              <React.Fragment key={i}>
-                <motion.span
-                  initial={{ opacity: 0, y: 28, filter: 'blur(8px)' }}
-                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                  transition={{ type: 'spring', bounce: 0.2, duration: 1.2, delay: 0.1 + i * 0.09 }}
-                  style={{
-                    display: 'inline-block',
-                    color: word.accent ? 'var(--accent)' : 'inherit',
-                    marginRight: '0.25em',
-                  }}
-                >
-                  {word.text}
-                </motion.span>
-                {word.break && <br />}
-              </React.Fragment>
-            ))}
-          </h1>
-
-          {/* Sub */}
-          <motion.p
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.9 }}
-            style={{
-              fontSize: 17,
-              lineHeight: 1.65,
-              color: 'var(--text-muted)',
-              maxWidth: 400,
-              marginBottom: 40,
-            }}
-          >
-            Veille automatique sur 5 canaux. Alertes instantanées. Aucune configuration manuelle.
-          </motion.p>
-
-          {/* CTAs */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 1.05 }}
-            className="flex items-center gap-3"
-          >
-            <Link
-              href="/sign-up"
-              className="text-[15px] font-semibold px-6 py-3 rounded-lg text-white transition-all duration-150"
-              style={{ background: 'var(--accent)' }}
-            >
-              Commencer gratuitement
-            </Link>
-            <Link
-              href="#fonctionnalites"
-              className="text-[15px] font-medium px-6 py-3 rounded-lg border transition-colors duration-150"
-              style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
-            >
-              Voir les fonctionnalités
-            </Link>
-          </motion.div>
-        </div>
-
-        {/* RIGHT — scrolling ad columns, full height */}
+        {/* Eyebrow */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1.2, delay: 0.3 }}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.05 }}
+          className="inline-flex items-center gap-2 mb-8"
           style={{
-            position: 'relative',
-            overflow: 'hidden',
+            fontFamily: 'var(--font-jetbrains-mono)',
+            fontSize: 11,
+            fontWeight: 500,
+            textTransform: 'uppercase',
+            letterSpacing: '0.09em',
+            color: 'var(--text-muted)',
           }}
         >
-          <SideAdColumns ads={demoAds} />
+          <span
+            aria-hidden="true"
+            style={{
+              display: 'inline-block',
+              width: 7,
+              height: 7,
+              borderRadius: 9999,
+              background: 'var(--success)',
+              animation: 'pulse-dot 2.4s ease-in-out infinite',
+            }}
+          />
+          Surveillance active — 5 canaux
+        </motion.div>
 
-          {/* Left fade → blends into page background */}
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'linear-gradient(to right, var(--bg) 0%, transparent 18%, transparent 82%, var(--bg) 100%)',
-              pointerEvents: 'none',
-            }}
-          />
-          {/* Top + bottom fades */}
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'linear-gradient(to bottom, var(--bg) 0%, transparent 10%, transparent 88%, var(--bg) 100%)',
-              pointerEvents: 'none',
-            }}
-          />
+        {/* H1 */}
+        <h1
+          style={{
+            fontFamily: 'var(--font-inter)',
+            fontSize: 72,
+            fontWeight: 800,
+            lineHeight: 1.08,
+            letterSpacing: '-0.04em',
+            color: 'var(--text)',
+            marginBottom: 24,
+          }}
+        >
+          {H1_WORDS.map((word, i) => (
+            <React.Fragment key={i}>
+              <motion.span
+                initial={{ opacity: 0, y: 28, filter: 'blur(8px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                transition={{ type: 'spring', bounce: 0.2, duration: 1.2, delay: 0.1 + i * 0.09 }}
+                style={{
+                  display: 'inline-block',
+                  color: word.accent ? 'var(--accent)' : 'inherit',
+                  marginRight: '0.25em',
+                }}
+              >
+                {word.text}
+              </motion.span>
+              {word.break && <br />}
+            </React.Fragment>
+          ))}
+        </h1>
+
+        {/* Sub */}
+        <motion.p
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.9 }}
+          style={{
+            fontSize: 18,
+            lineHeight: 1.65,
+            color: 'var(--text-muted)',
+            maxWidth: 480,
+            margin: '0 auto 40px',
+          }}
+        >
+          Veille automatique sur 5 canaux. Alertes instantanées. Aucune configuration manuelle.
+        </motion.p>
+
+        {/* CTAs */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 1.05 }}
+          className="flex items-center justify-center gap-3"
+        >
+          <Link
+            href="/sign-up"
+            className="text-[15px] font-semibold px-6 py-3 rounded-lg text-white transition-all duration-150"
+            style={{ background: 'var(--accent)' }}
+          >
+            Commencer gratuitement
+          </Link>
+          <Link
+            href="#fonctionnalites"
+            className="text-[15px] font-medium px-6 py-3 rounded-lg border transition-colors duration-150"
+            style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}
+          >
+            Voir les fonctionnalités
+          </Link>
         </motion.div>
       </div>
 
