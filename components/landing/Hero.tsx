@@ -400,12 +400,10 @@ export function Hero({ demoAds }: { demoAds: DemoAdData[] }) {
         style={{ position: 'absolute', inset: 0, zIndex: 0 }}
       >
         <BackgroundGrid ads={demoAds} />
-        {/* Base overlay — dims ads uniformly */}
-        <div style={{ position: 'absolute', inset: 0, background: 'var(--bg)', opacity: 0.68 }} />
-        {/* Radial spotlight — extra dark behind text center */}
-        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 60% 55% at 50% 45%, rgba(0,0,0,0.55) 0%, transparent 100%)', pointerEvents: 'none' }} />
+        {/* Overlay — subtle tint so ads don't compete with text */}
+        <div style={{ position: 'absolute', inset: 0, background: 'var(--bg)', opacity: 0.82 }} />
         {/* Top + bottom gradient fades */}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, var(--bg) 0%, transparent 15%, transparent 78%, var(--bg) 100%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, var(--bg) 0%, transparent 12%, transparent 82%, var(--bg) 100%)', pointerEvents: 'none' }} />
       </motion.div>
 
       {/* ── Centered text content ── */}
@@ -415,7 +413,7 @@ export function Hero({ demoAds }: { demoAds: DemoAdData[] }) {
           zIndex: 1,
           maxWidth: 720,
           margin: '0 auto',
-          padding: '120px 24px 80px',
+          padding: '64px 24px 28px',
           textAlign: 'center',
         }}
       >
@@ -458,7 +456,6 @@ export function Hero({ demoAds }: { demoAds: DemoAdData[] }) {
             letterSpacing: '-0.04em',
             color: 'var(--text)',
             marginBottom: 24,
-            textShadow: '0 2px 24px rgba(0,0,0,0.5)',
           }}
         >
           {H1_WORDS.map((word, i) => (
@@ -490,7 +487,7 @@ export function Hero({ demoAds }: { demoAds: DemoAdData[] }) {
             lineHeight: 1.65,
             color: 'var(--text-muted)',
             maxWidth: 480,
-            margin: '0 auto 40px',
+            margin: '0 auto 28px',
           }}
         >
           Veille automatique sur 5 canaux. Alertes instantanées. Aucune configuration manuelle.
@@ -520,14 +517,14 @@ export function Hero({ demoAds }: { demoAds: DemoAdData[] }) {
         </motion.div>
       </div>
 
-      {/* ── App mockup — full width below the split ── */}
+      {/* ── App mockup — visible at fold ── */}
       <motion.div
         aria-hidden="true"
-        className="mx-auto max-w-[1100px] px-12"
+        className="mx-auto max-w-[1100px] px-6"
         initial="hidden"
         animate="visible"
         variants={springMockup}
-        style={{ paddingBottom: 0 }}
+        style={{ position: 'relative', zIndex: 1, paddingBottom: 0 }}
       >
         <div
           className="overflow-hidden rounded-2xl"
