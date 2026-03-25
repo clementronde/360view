@@ -313,6 +313,50 @@ const springMockup = {
   },
 }
 
+/* ─── Right-side scrolling ad columns (3 cols, visible) ─────────────────────── */
+const SIDE_DURATIONS = [44, 34, 52]
+
+function SideAdColumns({ ads }: { ads: DemoAdData[] }) {
+  const cols = [0, 1, 2]
+
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        display: 'flex',
+        gap: 8,
+        height: '100%',
+        pointerEvents: 'none',
+        userSelect: 'none',
+      }}
+    >
+      {cols.map((col) => {
+        const dir = col % 2 === 0 ? 'bg-scroll-up' : 'bg-scroll-down'
+        const colCards = Array.from({ length: 6 }, (_, row) => {
+          const idx = col + row * 3
+          return { card: BG_CARDS[idx % BG_CARDS.length], realAd: ads.length > 0 ? ads[idx % ads.length] : null }
+        })
+        return (
+          <div key={col} style={{ flex: 1, overflow: 'hidden' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                animation: `${dir} ${SIDE_DURATIONS[col]}s linear infinite`,
+              }}
+            >
+              {[...colCards, ...colCards].map(({ card, realAd }, i) => (
+                <BgCard key={i} card={card} realAd={realAd} />
+              ))}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 /* ═══════════════════════════════════════════
    HERO COMPONENT
 ═══════════════════════════════════════════ */
@@ -321,13 +365,11 @@ export function Hero({ demoAds }: { demoAds: DemoAdData[] }) {
   const [scanY, setScanY] = useState<number>(0)
   const [scanVisible, setScanVisible] = useState<boolean>(false)
 
-  /* Mount delay for ad cards */
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 900)
     return () => clearTimeout(t)
   }, [])
 
-  /* Scan line animation */
   useEffect(() => {
     const id = setInterval(() => {
       setScanVisible(true)
@@ -336,55 +378,38 @@ export function Hero({ demoAds }: { demoAds: DemoAdData[] }) {
       const raf = () => {
         const p = Math.min((Date.now() - start) / 1500, 1)
         setScanY(p * 100)
-        if (p < 1) {
-          requestAnimationFrame(raf)
-        } else {
-          setTimeout(() => setScanVisible(false), 200)
-        }
+        if (p < 1) requestAnimationFrame(raf)
+        else setTimeout(() => setScanVisible(false), 200)
       }
       requestAnimationFrame(raf)
     }, 3500)
     return () => clearInterval(id)
   }, [])
 
-  /* Display ads: real if available, fallback to CSS-art */
   const displayAds = demoAds.length > 0 ? demoAds.slice(0, 10) : null
 
   return (
     <section style={{ position: 'relative', overflow: 'hidden', background: 'var(--bg)' }}>
 
-      {/* Scrolling ads background — suction/magnet effect */}
+      {/* ── Split layout: text left | ad columns right ── */}
       <div
-        aria-hidden="true"
         style={{
-          position: 'absolute',
-          inset: 0,
-          zIndex: 0,
-          overflow: 'hidden',
-          opacity: 0.07,
-          /* Sharp mask: pop-in at top, sucked out at bottom */
-          maskImage: 'linear-gradient(to bottom, transparent 0%, black 5%, black 80%, transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 5%, black 80%, transparent 100%)',
-          pointerEvents: 'none',
-          /* 3D perspective — creates depth/suction tunnel illusion */
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          maxWidth: 1400,
+          margin: '0 auto',
+          minHeight: 680,
         }}
       >
-        <BackgroundGrid ads={demoAds} />
-      </div>
-
-      {/* Content */}
-      <div style={{ position: 'relative', zIndex: 10 }}>
-
-        {/* Centered text block */}
+        {/* LEFT — text content */}
         <div
           style={{
-            textAlign: 'center',
-            maxWidth: 720,
-            margin: '0 auto',
-            padding: '100px 48px 64px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            padding: '100px 64px 80px',
           }}
         >
-
           {/* Eyebrow */}
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -414,13 +439,13 @@ export function Hero({ demoAds }: { demoAds: DemoAdData[] }) {
             Surveillance active — 5 canaux
           </motion.div>
 
-          {/* H1 word-by-word animation */}
+          {/* H1 */}
           <h1
             style={{
               fontFamily: 'var(--font-inter)',
-              fontSize: 68,
+              fontSize: 64,
               fontWeight: 800,
-              lineHeight: 1.1,
+              lineHeight: 1.08,
               letterSpacing: '-0.04em',
               color: 'var(--text)',
               marginBottom: 24,
@@ -454,8 +479,8 @@ export function Hero({ demoAds }: { demoAds: DemoAdData[] }) {
               fontSize: 17,
               lineHeight: 1.65,
               color: 'var(--text-muted)',
-              maxWidth: 440,
-              margin: '0 auto 40px',
+              maxWidth: 400,
+              marginBottom: 40,
             }}
           >
             Veille automatique sur 5 canaux. Alertes instantanées. Aucune configuration manuelle.
@@ -466,7 +491,7 @@ export function Hero({ demoAds }: { demoAds: DemoAdData[] }) {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 1.05 }}
-            className="flex items-center justify-center gap-3"
+            className="flex items-center gap-3"
           >
             <Link
               href="/sign-up"
@@ -485,426 +510,156 @@ export function Hero({ demoAds }: { demoAds: DemoAdData[] }) {
           </motion.div>
         </div>
 
-        {/* App mockup */}
+        {/* RIGHT — scrolling ad columns, full height */}
         <motion.div
-          aria-hidden="true"
-          className="mx-auto max-w-[1100px] px-12"
-          initial="hidden"
-          animate="visible"
-          variants={springMockup}
-          style={{ paddingBottom: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1.2, delay: 0.3 }}
+          style={{
+            position: 'relative',
+            overflow: 'hidden',
+          }}
         >
+          <SideAdColumns ads={demoAds} />
+
+          {/* Left fade → blends into page background */}
           <div
-            className="overflow-hidden rounded-2xl"
             style={{
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              boxShadow: '0 48px 96px rgba(0,0,0,0.14), 0 8px 28px rgba(0,0,0,0.07)',
+              position: 'absolute',
+              inset: 0,
+              background: 'linear-gradient(to right, var(--bg) 0%, transparent 18%, transparent 82%, var(--bg) 100%)',
+              pointerEvents: 'none',
             }}
+          />
+          {/* Top + bottom fades */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'linear-gradient(to bottom, var(--bg) 0%, transparent 10%, transparent 88%, var(--bg) 100%)',
+              pointerEvents: 'none',
+            }}
+          />
+        </motion.div>
+      </div>
+
+      {/* ── App mockup — full width below the split ── */}
+      <motion.div
+        aria-hidden="true"
+        className="mx-auto max-w-[1100px] px-12"
+        initial="hidden"
+        animate="visible"
+        variants={springMockup}
+        style={{ paddingBottom: 0 }}
+      >
+        <div
+          className="overflow-hidden rounded-2xl"
+          style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            boxShadow: '0 48px 96px rgba(0,0,0,0.14), 0 8px 28px rgba(0,0,0,0.07)',
+          }}
+        >
+          {/* Browser chrome */}
+          <div
+            className="flex items-center px-4 py-2.5"
+            style={{ background: 'var(--surface-muted)', borderBottom: '1px solid var(--border)' }}
           >
-            {/* Browser chrome bar */}
-            <div
-              className="flex items-center px-4 py-2.5"
-              style={{ background: 'var(--surface-muted)', borderBottom: '1px solid var(--border)' }}
-            >
-              <div className="flex gap-1.5 mr-4">
-                <div style={{ width: 10, height: 10, borderRadius: 9999, background: '#EF4444' }} />
-                <div style={{ width: 10, height: 10, borderRadius: 9999, background: '#F59E0B' }} />
-                <div style={{ width: 10, height: 10, borderRadius: 9999, background: '#22C55E' }} />
+            <div className="flex gap-1.5 mr-4">
+              <div style={{ width: 10, height: 10, borderRadius: 9999, background: '#EF4444' }} />
+              <div style={{ width: 10, height: 10, borderRadius: 9999, background: '#F59E0B' }} />
+              <div style={{ width: 10, height: 10, borderRadius: 9999, background: '#22C55E' }} />
+            </div>
+            <span style={{ fontFamily: 'var(--font-jetbrains-mono)', fontSize: 11, color: 'var(--text-muted)' }}>
+              spymark.io/dashboard/ads
+            </span>
+            <div className="ml-auto flex items-center gap-1.5">
+              <span style={{ width: 6, height: 6, borderRadius: 9999, background: 'var(--success)', display: 'inline-block', animation: 'pulse-dot 2.4s ease-in-out infinite' }} />
+              <span style={{ fontFamily: 'var(--font-jetbrains-mono)', fontSize: 10, color: 'var(--success)' }}>Live</span>
+            </div>
+          </div>
+
+          {/* App body */}
+          <div style={{ display: 'grid', gridTemplateColumns: '48px 1fr' }}>
+            {/* Mini sidebar */}
+            <div style={{ borderRight: '1px solid var(--border)', background: 'var(--surface-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 12, paddingBottom: 12, gap: 2 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 6, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10, flexShrink: 0 }}>
+                <Eye size={14} color="#fff" />
               </div>
-              <span style={{ fontFamily: 'var(--font-jetbrains-mono)', fontSize: 11, color: 'var(--text-muted)' }}>
-                spymark.io/dashboard/ads
-              </span>
-              <div className="ml-auto flex items-center gap-1.5">
-                <span
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: 9999,
-                    background: 'var(--success)',
-                    display: 'inline-block',
-                    animation: 'pulse-dot 2.4s ease-in-out infinite',
-                  }}
-                />
-                <span style={{ fontFamily: 'var(--font-jetbrains-mono)', fontSize: 10, color: 'var(--success)' }}>Live</span>
-              </div>
+              {NAV_ITEMS.map(({ Icon, label, active }) => (
+                <div key={label} title={label} style={{ width: 34, height: 34, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', background: active ? 'var(--accent)' : 'transparent', color: active ? '#fff' : 'var(--text-muted)', cursor: 'default', flexShrink: 0 }}>
+                  <Icon size={15} />
+                </div>
+              ))}
             </div>
 
-            {/* App body: 48px sidebar + main content */}
-            <div style={{ display: 'grid', gridTemplateColumns: '48px 1fr' }}>
-
-              {/* Mini sidebar */}
-              <div
-                style={{
-                  borderRight: '1px solid var(--border)',
-                  background: 'var(--surface-muted)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  paddingTop: 12,
-                  paddingBottom: 12,
-                  gap: 2,
-                }}
-              >
-                <div
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 6,
-                    background: 'var(--accent)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: 10,
-                    flexShrink: 0,
-                  }}
-                >
-                  <Eye size={14} color="#fff" />
+            {/* Main content */}
+            <div style={{ padding: '16px 18px', minHeight: 520, position: 'relative' }}>
+              <div className="flex items-center justify-between mb-3">
+                <span style={{ fontFamily: 'var(--font-inter)', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+                  Galerie publicitaire
+                </span>
+                <div style={{ background: 'var(--accent)', color: '#fff', fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, cursor: 'default', letterSpacing: '-0.01em' }}>
+                  Lancer le scraping
                 </div>
+              </div>
 
-                {NAV_ITEMS.map(({ Icon, label, active }) => (
-                  <div
-                    key={label}
-                    title={label}
-                    style={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: 7,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background: active ? 'var(--accent)' : 'transparent',
-                      color: active ? '#fff' : 'var(--text-muted)',
-                      cursor: 'default',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <Icon size={15} />
+              <div className="flex items-center gap-2 mb-4">
+                {PLATFORMS.map((p, i) => (
+                  <div key={p} style={{ fontFamily: 'var(--font-jetbrains-mono)', fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', padding: '3px 8px', borderRadius: 4, cursor: 'default', background: i === 0 ? 'var(--accent)' : 'transparent', color: i === 0 ? '#fff' : 'var(--text-muted)', border: i === 0 ? '1px solid transparent' : '1px solid var(--border)' }}>
+                    {p}
                   </div>
                 ))}
               </div>
 
-              {/* Main content */}
-              <div style={{ padding: '16px 18px', minHeight: 520, position: 'relative' }}>
-
-                {/* Header row */}
-                <div className="flex items-center justify-between mb-3">
-                  <span
-                    style={{
-                      fontFamily: 'var(--font-inter)',
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: 'var(--text)',
-                    }}
-                  >
-                    Galerie publicitaire
-                  </span>
-                  <div
-                    style={{
-                      background: 'var(--accent)',
-                      color: '#fff',
-                      fontSize: 11,
-                      fontWeight: 600,
-                      padding: '4px 10px',
-                      borderRadius: 6,
-                      cursor: 'default',
-                      letterSpacing: '-0.01em',
-                    }}
-                  >
-                    Lancer le scraping
-                  </div>
-                </div>
-
-                {/* Filter tabs */}
-                <div className="flex items-center gap-2 mb-4">
-                  {PLATFORMS.map((p, i) => (
-                    <div
-                      key={p}
-                      style={{
-                        fontFamily: 'var(--font-jetbrains-mono)',
-                        fontSize: 9,
-                        fontWeight: 600,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.06em',
-                        padding: '3px 8px',
-                        borderRadius: 4,
-                        cursor: 'default',
-                        background: i === 0 ? 'var(--accent)' : 'transparent',
-                        color: i === 0 ? '#fff' : 'var(--text-muted)',
-                        border: i === 0 ? '1px solid transparent' : '1px solid var(--border)',
-                      }}
-                    >
-                      {p}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Ad gallery */}
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(5, 1fr)',
-                    gap: 6,
-                    alignItems: 'end',
-                    position: 'relative',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {/* Scan line */}
-                  {scanVisible && (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        left: 0,
-                        right: 0,
-                        top: `${scanY}%`,
-                        height: 2,
-                        background: 'var(--accent)',
-                        opacity: 0.6,
-                        zIndex: 10,
-                        pointerEvents: 'none',
-                      }}
-                    />
-                  )}
-
-                  {displayAds
-                    ? displayAds.map((ad, i) => {
-                        const h = i % 2 === 0 ? 145 : 165
-                        const fallback = AD_CARDS[i % AD_CARDS.length]
-                        const bgStyle = ad.imageUrl
-                          ? { background: `url(${ad.imageUrl}) center/cover no-repeat` }
-                          : { background: fallback.bg }
-                        return (
-                          <motion.div
-                            key={ad.id}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={mounted ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
-                            transition={{ duration: 0.4, delay: i * 0.06, ease: 'easeOut' }}
-                            style={{
-                              position: 'relative',
-                              overflow: 'hidden',
-                              ...bgStyle,
-                              borderRadius: 8,
-                              height: h,
-                            }}
-                          >
-                            {/* Gradient overlay for image ads */}
-                            {ad.imageUrl && (
-                              <div
-                                style={{
-                                  position: 'absolute',
-                                  inset: 0,
-                                  background: 'linear-gradient(to top, rgba(0,0,0,0.80) 0%, transparent 50%)',
-                                  zIndex: 1,
-                                }}
-                              />
-                            )}
-                            {/* Platform chip */}
-                            <div
-                              style={{
-                                position: 'absolute',
-                                top: 6,
-                                left: 6,
-                                fontFamily: 'var(--font-jetbrains-mono)',
-                                fontSize: 7,
-                                color: 'rgba(255,255,255,0.65)',
-                                background: 'rgba(0,0,0,0.50)',
-                                padding: '2px 5px',
-                                borderRadius: 2,
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.06em',
-                                zIndex: 2,
-                              }}
-                            >
-                              {ad.platform}
+              {/* Ad gallery grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6, alignItems: 'end', position: 'relative', overflow: 'hidden' }}>
+                {scanVisible && (
+                  <div style={{ position: 'absolute', left: 0, right: 0, top: `${scanY}%`, height: 2, background: 'var(--accent)', opacity: 0.6, zIndex: 10, pointerEvents: 'none' }} />
+                )}
+                {displayAds
+                  ? displayAds.map((ad, i) => {
+                      const h = i % 2 === 0 ? 145 : 165
+                      const fallback = AD_CARDS[i % AD_CARDS.length]
+                      const bgStyle = ad.imageUrl ? { background: `url(${ad.imageUrl}) center/cover no-repeat` } : { background: fallback.bg }
+                      return (
+                        <motion.div key={ad.id} initial={{ opacity: 0, y: 10 }} animate={mounted ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }} transition={{ duration: 0.4, delay: i * 0.06 }} style={{ position: 'relative', overflow: 'hidden', ...bgStyle, borderRadius: 8, height: h }}>
+                          {ad.imageUrl && <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.80) 0%, transparent 50%)', zIndex: 1 }} />}
+                          <div style={{ position: 'absolute', top: 6, left: 6, fontFamily: 'var(--font-jetbrains-mono)', fontSize: 7, color: 'rgba(255,255,255,0.65)', background: 'rgba(0,0,0,0.50)', padding: '2px 5px', borderRadius: 2, textTransform: 'uppercase', letterSpacing: '0.06em', zIndex: 2 }}>{ad.platform}</div>
+                          {i < 2 && <div style={{ position: 'absolute', top: 6, right: 6, fontFamily: 'var(--font-jetbrains-mono)', fontSize: 7, color: '#fff', background: '#4F6EF7', padding: '2px 5px', borderRadius: 2, textTransform: 'uppercase', zIndex: 2 }}>NEW</div>}
+                          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 8, zIndex: 2 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.9)', lineHeight: 1.2, marginBottom: 3 }}>{ad.title ?? fallback.headline}</div>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', background: fallback.accent, borderRadius: 2, padding: '2px 7px' }}>
+                              <span style={{ fontSize: 8, fontWeight: 700, color: '#000' }}>{ad.ctaText ?? 'Voir'}</span>
                             </div>
-                            {/* NEW chip */}
-                            {i < 2 && (
-                              <div
-                                style={{
-                                  position: 'absolute',
-                                  top: 6,
-                                  right: 6,
-                                  fontFamily: 'var(--font-jetbrains-mono)',
-                                  fontSize: 7,
-                                  color: '#fff',
-                                  background: '#4F6EF7',
-                                  padding: '2px 5px',
-                                  borderRadius: 2,
-                                  textTransform: 'uppercase',
-                                  letterSpacing: '0.06em',
-                                  zIndex: 2,
-                                }}
-                              >
-                                NEW
-                              </div>
-                            )}
-                            {/* Content */}
-                            <div
-                              style={{
-                                position: 'absolute',
-                                bottom: 0,
-                                left: 0,
-                                right: 0,
-                                padding: 8,
-                                zIndex: 2,
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontSize: 11,
-                                  fontWeight: 600,
-                                  color: 'rgba(255,255,255,0.9)',
-                                  lineHeight: 1.2,
-                                  marginBottom: 3,
-                                }}
-                              >
-                                {ad.title ?? fallback.headline}
-                              </div>
-                              <div
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  background: fallback.accent,
-                                  borderRadius: 2,
-                                  padding: '2px 7px',
-                                }}
-                              >
-                                <span style={{ fontSize: 8, fontWeight: 700, color: '#000' }}>
-                                  {ad.ctaText ?? 'Voir'}
-                                </span>
-                              </div>
+                          </div>
+                        </motion.div>
+                      )
+                    })
+                  : AD_CARDS.map((ad, i) => {
+                      const h = i % 2 === 0 ? 145 : 165
+                      return (
+                        <motion.div key={`${ad.brand}-${i}`} initial={{ opacity: 0, y: 10 }} animate={mounted ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }} transition={{ duration: 0.4, delay: i * 0.06 }} style={{ position: 'relative', overflow: 'hidden', background: ad.bg, borderRadius: 8, height: h }}>
+                          <AdShape shape={ad.shape} accent={ad.accent} />
+                          <div style={{ position: 'absolute', top: 6, left: 6, fontFamily: 'var(--font-jetbrains-mono)', fontSize: 7, color: 'rgba(255,255,255,0.65)', background: 'rgba(0,0,0,0.50)', padding: '2px 5px', borderRadius: 2, textTransform: 'uppercase', zIndex: 2 }}>{ad.platform}</div>
+                          {ad.isNew && <div style={{ position: 'absolute', top: 6, right: 6, fontFamily: 'var(--font-jetbrains-mono)', fontSize: 7, color: '#fff', background: '#4F6EF7', padding: '2px 5px', borderRadius: 2, textTransform: 'uppercase', zIndex: 2 }}>NEW</div>}
+                          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.80) 0%, transparent 50%)', zIndex: 1 }} />
+                          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: 8, zIndex: 2 }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', letterSpacing: '-0.01em', marginBottom: 1 }}>{ad.brand}</div>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.9)', lineHeight: 1.2, marginBottom: 3 }}>{ad.headline}</div>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', background: ad.accent, borderRadius: 2, padding: '2px 7px' }}>
+                              <span style={{ fontSize: 8, fontWeight: 700, color: '#000' }}>{ad.cta}</span>
                             </div>
-                          </motion.div>
-                        )
-                      })
-                    : AD_CARDS.map((ad, i) => {
-                        const h = i % 2 === 0 ? 145 : 165
-                        return (
-                          <motion.div
-                            key={`${ad.brand}-${ad.platform}-${i}`}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={mounted ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
-                            transition={{ duration: 0.4, delay: i * 0.06, ease: 'easeOut' }}
-                            style={{
-                              position: 'relative',
-                              overflow: 'hidden',
-                              background: ad.bg,
-                              borderRadius: 8,
-                              height: h,
-                            }}
-                          >
-                            <AdShape shape={ad.shape} accent={ad.accent} />
-
-                            {/* Platform chip */}
-                            <div
-                              style={{
-                                position: 'absolute',
-                                top: 6,
-                                left: 6,
-                                fontFamily: 'var(--font-jetbrains-mono)',
-                                fontSize: 7,
-                                color: 'rgba(255,255,255,0.65)',
-                                background: 'rgba(0,0,0,0.50)',
-                                padding: '2px 5px',
-                                borderRadius: 2,
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.06em',
-                                zIndex: 2,
-                              }}
-                            >
-                              {ad.platform}
-                            </div>
-
-                            {/* NEW chip */}
-                            {ad.isNew && (
-                              <div
-                                style={{
-                                  position: 'absolute',
-                                  top: 6,
-                                  right: 6,
-                                  fontFamily: 'var(--font-jetbrains-mono)',
-                                  fontSize: 7,
-                                  color: '#fff',
-                                  background: '#4F6EF7',
-                                  padding: '2px 5px',
-                                  borderRadius: 2,
-                                  textTransform: 'uppercase',
-                                  letterSpacing: '0.06em',
-                                  zIndex: 2,
-                                }}
-                              >
-                                NEW
-                              </div>
-                            )}
-
-                            {/* Bottom gradient overlay */}
-                            <div
-                              style={{
-                                position: 'absolute',
-                                inset: 0,
-                                background: 'linear-gradient(to top, rgba(0,0,0,0.80) 0%, transparent 50%)',
-                                zIndex: 1,
-                              }}
-                            />
-
-                            {/* Content */}
-                            <div
-                              style={{
-                                position: 'absolute',
-                                bottom: 0,
-                                left: 0,
-                                right: 0,
-                                padding: 8,
-                                zIndex: 2,
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontSize: 10,
-                                  fontWeight: 700,
-                                  color: '#fff',
-                                  letterSpacing: '-0.01em',
-                                  marginBottom: 1,
-                                }}
-                              >
-                                {ad.brand}
-                              </div>
-                              <div
-                                style={{
-                                  fontSize: 11,
-                                  fontWeight: 600,
-                                  color: 'rgba(255,255,255,0.9)',
-                                  lineHeight: 1.2,
-                                  marginBottom: 3,
-                                }}
-                              >
-                                {ad.headline}
-                              </div>
-                              <div
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  background: ad.accent,
-                                  borderRadius: 2,
-                                  padding: '2px 7px',
-                                }}
-                              >
-                                <span style={{ fontSize: 8, fontWeight: 700, color: '#000' }}>
-                                  {ad.cta}
-                                </span>
-                              </div>
-                            </div>
-                          </motion.div>
-                        )
-                      })
-                  }
-                </div>
+                          </div>
+                        </motion.div>
+                      )
+                    })
+                }
               </div>
             </div>
           </div>
-        </motion.div>
-      </div>
+        </div>
+      </motion.div>
 
       <style>{`
         @keyframes pulse-dot {
