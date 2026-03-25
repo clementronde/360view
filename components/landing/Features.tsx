@@ -390,7 +390,7 @@ function LlmSection() {
   }, [vis])
 
   return (
-    <section style={{ background: 'var(--surface-muted)' }}>
+    <section id="fonctionnalites" style={{ background: 'var(--surface-muted)' }}>
       <div className="mx-auto max-w-[1100px] px-12" style={{ paddingTop: 96, paddingBottom: 96 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.35fr', gap: 56, alignItems: 'center' }}>
 
@@ -1011,7 +1011,6 @@ function EmailSmsSection() {
 export function Features(_props: { demoAds: unknown }) {
   return (
     <>
-      <AdsSection />
       <LlmSection />
       <SeoSection />
       <EmailSmsSection />

@@ -1,35 +1,123 @@
-/**
- * Mass scrape worker — run once on Railway to populate 10k+ ads
- *
- * Scrapes Meta Ad Library for every brand in popularBrands.ts + fintechBrands.ts
- * Runs without timeout (unlike Vercel server actions).
- *
- * Usage on Railway:
- *   Temporarily set startCommand = "node_modules/.bin/tsx --tsconfig tsconfig.worker.json workers/massScrape.ts"
- *   Deploy → it runs once, exits when TARGET_ADS reached or all brands done.
- *
- * Required env: DATABASE_URL, DIRECT_URL, NEXT_PUBLIC_SUPABASE_URL,
- *               NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
- */
+// Mass scraping worker — runs ONCE to seed the database with a large ad library
+// Set as Railway Start Command temporarily:
+//   node_modules/.bin/tsx --tsconfig tsconfig.worker.json workers/massScrape.ts
+//
+// Required env: DATABASE_URL, DIRECT_URL, META_ACCESS_TOKEN
+//
+// After this run completes, switch Railway Start Command back to adsCron.ts
 
 import { prisma } from '@/lib/prisma'
-import { scrapeMetaAdLibraryByBrandSearch } from '@/lib/scraping/ads'
-import { uploadScreenshot } from '@/lib/supabase'
-import { ALL_POPULAR_BRANDS } from '@/lib/popularBrands'
-import { FINTECH_BRANDS } from '@/lib/fintechBrands'
+import { scrapeMetaAdLibraryAPI } from '@/lib/scraping/ads'
 import type { AdPlatform, AdFormat } from '@prisma/client'
 
-// ─── Config ───────────────────────────────────────────────────────────────────
+// ─── 500+ brands across categories ──────────────────────────────────────────
 
-const TARGET_ADS   = parseInt(process.env.MASS_SCRAPE_TARGET ?? '10000')
-const DELAY_MS     = parseInt(process.env.MASS_SCRAPE_DELAY  ?? '3000')  // pause entre marques
+const BRANDS = [
+  // Mode & Sport
+  'Nike', 'Adidas', 'Puma', 'New Balance', 'Asics', 'Reebok', 'Under Armour',
+  'Lululemon', 'Salomon', 'The North Face', 'Patagonia', 'Columbia',
+  'Zara', 'H&M', 'Uniqlo', 'Mango', 'Pull&Bear', 'Bershka', 'Reserved',
+  'Kiabi', 'La Redoute', 'Zalando', 'ASOS', 'Shein', 'Primark',
+  'Louis Vuitton', 'Gucci', 'Hermès', 'Chanel', 'Dior', 'Prada', 'Balenciaga',
+  'Valentino', 'Burberry', 'Versace', 'Fendi', 'Bottega Veneta',
+  'Lacoste', 'Ralph Lauren', 'Tommy Hilfiger', 'Calvin Klein', "Levi's",
+  'Diesel', 'G-Star', 'Jack & Jones', 'Sézane', 'Jacquemus', 'Isabel Marant',
 
-// ─── All brands to scrape ─────────────────────────────────────────────────────
+  // Beauté & Cosmétiques
+  'Sephora', 'L\'Oreal', 'Lancôme', 'Maybelline', 'NYX', 'Urban Decay',
+  'MAC Cosmetics', 'Charlotte Tilbury', 'NARS', 'Benefit', 'Too Faced',
+  'Fenty Beauty', 'Huda Beauty', 'Rare Beauty',
+  'The Ordinary', 'CeraVe', 'La Roche-Posay', 'Vichy', 'Avène',
+  "Kiehl's", 'Clinique', 'Estée Lauder', 'Shiseido',
+  'Clarins', 'Biotherm', 'Neutrogena', 'Garnier', 'Nivea', 'Dove',
+  'Rituals', 'Aesop', 'Diptyque', 'Jo Malone', 'Byredo',
 
-const ALL_BRANDS = [
-  ...ALL_POPULAR_BRANDS.map(b => ({ name: b.name, searchQuery: b.searchQuery })),
-  ...FINTECH_BRANDS.map(b => ({ name: b.name, searchQuery: b.name })),
+  // Tech & Électronique
+  'Apple', 'Samsung', 'Google', 'Microsoft', 'Sony', 'LG', 'Huawei',
+  'Xiaomi', 'OnePlus', 'Motorola', 'Asus', 'Dell', 'HP', 'Lenovo', 'Acer',
+  'MSI', 'Razer', 'Corsair', 'Logitech', 'Canon', 'Nikon', 'Fujifilm', 'GoPro', 'DJI',
+  'Beats', 'Bose', 'Sennheiser', 'JBL', 'Bang & Olufsen', 'Sonos',
+  'Dyson', 'Philips', 'De\'Longhi', 'Nespresso',
+  'Fitbit', 'Garmin', 'Polar',
+
+  // Alimentation & Boissons
+  'Coca-Cola', 'Pepsi', 'Red Bull', 'Monster Energy', 'Innocent',
+  "McDonald's", 'Burger King', 'KFC', 'Subway', "Domino's", 'Pizza Hut',
+  'Starbucks', 'Costa Coffee', 'Lavazza',
+  'Danone', 'Yoplait', 'Activia', 'Alpro',
+  'Ferrero', 'Nutella', 'Kinder', 'Milka', 'Kit Kat', 'Twix', 'Snickers',
+  "Lay's", 'Pringles', 'Haribo', 'Lindt', 'Godiva',
+  'Magnum', "Ben & Jerry's", 'Häagen-Dazs',
+  'Heinz', 'Knorr', 'Maggi',
+
+  // Grande Distribution & E-commerce
+  'Amazon', 'Cdiscount', 'Fnac', 'Darty', 'Boulanger', 'But',
+  'Leclerc', 'Carrefour', 'Auchan', 'Intermarché', 'Lidl', 'Aldi',
+  'Monoprix', 'Casino',
+  'IKEA', 'Leroy Merlin', 'Castorama', 'Bricomarché',
+  'Maisons du Monde', 'Cultura', 'Nature & Découvertes',
+  'Decathlon', 'Go Sport', 'Intersport',
+  'Vinted', 'Leboncoin', 'Back Market', 'Rakuten',
+
+  // Finance & Assurance
+  'BNP Paribas', 'Société Générale', 'Crédit Agricole', 'LCL',
+  'Caisse d\'Épargne', 'La Banque Postale', 'Crédit Mutuel',
+  'Boursorama', 'Hello Bank', 'Revolut', 'N26', 'Wise', 'Lydia', 'Sumeria',
+  'AXA', 'Allianz', 'Groupama', 'MAIF', 'MAAF', 'GMF', 'MMA', 'Generali',
+  'PayPal', 'Stripe', 'Trade Republic', 'eToro',
+
+  // Telecom & Médias
+  'Orange', 'SFR', 'Bouygues Telecom', 'Free',
+  'Netflix', 'Disney+', 'Canal+', 'Molotov',
+  'Spotify', 'Apple Music', 'Deezer',
+
+  // Automobile
+  'Renault', 'Peugeot', 'Citroën', 'Dacia', 'DS Automobiles',
+  'Volkswagen', 'BMW', 'Mercedes-Benz', 'Audi', 'Porsche',
+  'Toyota', 'Honda', 'Nissan', 'Kia', 'Hyundai', 'Mazda',
+  'Tesla', 'Volvo', 'Seat', 'Škoda', 'Fiat', 'Ford', 'Opel', 'Jeep',
+
+  // Voyage & Hôtellerie
+  'Airbnb', 'Booking.com', 'Expedia', 'Tripadvisor',
+  'Air France', 'EasyJet', 'Ryanair', 'Transavia',
+  'Accor Hotels', 'Marriott', 'Hilton', 'Ibis', 'Novotel',
+  'Club Med', 'TUI', 'Uber', 'BlaBlaCar', 'Flixbus', 'SNCF',
+
+  // Santé & Bien-être
+  'Nuxe', 'Weleda', 'Bioderma', 'SVR', 'Ducray', 'Kérastase',
+  "L'Occitane", 'Caudalie', 'Embryolisse',
+  'Myprotein', 'Foodspring', 'Optimum Nutrition',
+  'Doctolib', 'Alan', 'Luko',
+
+  // Immobilier & Services
+  'SeLoger', 'PAP', 'Orpi', 'Century 21',
+  'Meetic', 'Tinder', 'Bumble',
+  'Qonto', 'Papernest', 'EDF', 'Engie', 'TotalEnergies',
+
+  // Jeux & Divertissement
+  'PlayStation', 'Xbox', 'Nintendo', 'Steam', 'Epic Games',
+  'Ubisoft', 'EA Sports', 'Activision', 'Riot Games',
+
+  // Maison & Déco
+  'Zara Home', 'H&M Home', 'Maisons du Monde', 'Conforama', 'Fly',
+  'iRobot', 'Netatmo', 'Somfy', 'Weber', 'Tefal', 'SEB', 'Moulinex',
+
+  // Santé / Pharma
+  'Advil', 'Doliprane', 'Smecta', 'Gaviscon', 'Rennie',
+  'Sensodyne', 'Oral-B', 'Colgate', 'Elmex',
+
+  // B2B & SaaS
+  'Salesforce', 'HubSpot', 'Zendesk', 'Notion', 'Slack', 'Monday.com',
+  'Asana', 'Trello', 'Canva', 'Figma', 'Adobe', 'Dropbox',
+  'Mailchimp', 'Brevo', 'Klaviyo', 'ActiveCampaign',
+  'Shopify', 'WooCommerce', 'PrestaShop',
+  'OVHcloud', 'Scaleway', 'Infomaniak',
 ]
+
+// ─── Config ──────────────────────────────────────────────────────────────────
+
+const BATCH_SIZE = 8    // parallel HTTP requests
+const DELAY_MS   = 600  // ms between batches (rate limit safety)
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -37,128 +125,117 @@ function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr]
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[a[i], a[j]] = [a[j], a[i]]
-  }
-  return a
-}
-
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  console.log(`[massScrape] Starting — target: ${TARGET_ADS} ads from ${ALL_BRANDS.length} brands`)
+  console.log(`[massScrape] Starting at ${new Date().toISOString()}`)
+  console.log(`[massScrape] ${BRANDS.length} brands to scrape`)
 
-  // Get or create a shared demo org for discovery ads
+  if (!process.env.META_ACCESS_TOKEN) {
+    console.error('[massScrape] META_ACCESS_TOKEN is missing. Exiting.')
+    process.exit(1)
+  }
+
+  // Find or create discovery org
   let org = await prisma.organization.findFirst({ where: { clerkOrgId: 'mass_scrape_org' } })
   if (!org) {
     org = await prisma.organization.create({
       data: { clerkOrgId: 'mass_scrape_org', name: 'Discovery Library', slug: 'discovery-library' },
     })
+    console.log('[massScrape] Created discovery org')
   }
 
-  const brands = shuffle(ALL_BRANDS)
   let totalAdded = 0
   let totalSkipped = 0
-  let brandsDone = 0
+  let totalBrands = 0
 
-  for (const brand of brands) {
-    if (totalAdded >= TARGET_ADS) break
+  for (let i = 0; i < BRANDS.length; i += BATCH_SIZE) {
+    const batch = BRANDS.slice(i, i + BATCH_SIZE)
+    const batchNum = Math.floor(i / BATCH_SIZE) + 1
+    const totalBatches = Math.ceil(BRANDS.length / BATCH_SIZE)
+    console.log(`[massScrape] Batch ${batchNum}/${totalBatches} — ${batch.join(', ')}`)
 
-    brandsDone++
-    console.log(`\n[massScrape] [${brandsDone}/${brands.length}] ${brand.name} | added so far: ${totalAdded}/${TARGET_ADS}`)
+    const results = await Promise.allSettled(
+      batch.map(async (brandName) => {
+        const ads = await scrapeMetaAdLibraryAPI(brandName)
+        return { brandName, ads }
+      })
+    )
 
-    try {
-      const scrapedAds = await Promise.race([
-        scrapeMetaAdLibraryByBrandSearch(brand.name, brand.searchQuery),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), 120_000)
-        ),
-      ])
+    for (const result of results) {
+      if (result.status === 'rejected') continue
+      const { brandName, ads } = result.value
+      if (ads.length === 0) continue
 
-      if (scrapedAds.length === 0) {
-        console.log(`[massScrape] No ads for ${brand.name}`)
-        continue
-      }
+      totalBrands++
 
-      console.log(`[massScrape] ${brand.name}: ${scrapedAds.length} ads scraped`)
-
-      // Find or create competitor entry
+      // Find or create competitor entry for this brand
       let competitor = await prisma.competitor.findFirst({
-        where: { organizationId: org.id, name: { equals: brand.name, mode: 'insensitive' } },
+        where: { organizationId: org.id, name: { equals: brandName, mode: 'insensitive' } },
       })
       if (!competitor) {
         competitor = await prisma.competitor.create({
           data: {
             organizationId: org.id,
-            name: brand.name,
+            name: brandName,
             website: '',
-            brandName: brand.name,
+            brandName,
             isActive: false,
             trackAds: false,
           },
         })
       }
 
-      // Upload images + insert ads
-      let brandAdded = 0
-      for (const scraped of scrapedAds) {
-        if (!scraped.imageBuffer || !scraped.imageFilename) continue
-        if (totalAdded >= TARGET_ADS) break
-
-        try {
-          const uploaded = await uploadScreenshot(scraped.imageBuffer, scraped.imageFilename)
-          if (!uploaded) continue
-
-          // Dedup by imageUrl
-          const exists = await prisma.ad.findFirst({ where: { imageUrl: uploaded.url } })
-          if (exists) { totalSkipped++; continue }
-
-          await prisma.ad.create({
-            data: {
-              competitorId: competitor.id,
-              platform: scraped.platform as AdPlatform,
-              format: 'DISPLAY' as AdFormat,
-              source: 'DISCOVERY',
-              advertiserName: brand.name,
-              title: scraped.title ?? null,
-              description: scraped.description ?? null,
-              imageUrl: uploaded.url,
-              imageKey: uploaded.key,
-              ctaText: scraped.ctaText ?? null,
-              landingUrl: scraped.landingUrl ?? null,
-              rawData: (scraped.rawData as Record<string, string | number | boolean | null>) ?? {},
-              country: 'FR',
-              activeDays: 1,
-              engagementScore: 0,
-            },
+      for (const ad of ads) {
+        // Dedup by landingUrl
+        if (ad.landingUrl) {
+          const exists = await prisma.ad.findFirst({
+            where: { competitorId: competitor.id, landingUrl: ad.landingUrl },
+            select: { id: true },
           })
-
-          totalAdded++
-          brandAdded++
-        } catch (err) {
-          console.warn(`[massScrape] Failed to insert ad for ${brand.name}:`, err)
+          if (exists) { totalSkipped++; continue }
         }
+
+        await prisma.ad.create({
+          data: {
+            competitorId: competitor.id,
+            platform: ad.platform as AdPlatform,
+            format: (ad.format ?? 'DISPLAY') as AdFormat,
+            source: 'DISCOVERY',
+            advertiserName: brandName,
+            title: ad.title ?? null,
+            description: ad.description ?? null,
+            imageUrl: null,
+            ctaText: ad.ctaText ?? null,
+            landingUrl: ad.landingUrl ?? null,
+            rawData: (ad.rawData as object) ?? {},
+            contentHash: `${brandName}::${ad.landingUrl ?? ad.title ?? Date.now()}`,
+            country: 'FR',
+            activeDays: 1,
+            engagementScore: 0,
+          },
+        })
+        totalAdded++
       }
-
-      console.log(`[massScrape] ${brand.name}: +${brandAdded} new ads (${totalSkipped} duplicates)`)
-
-    } catch (err) {
-      console.error(`[massScrape] Error for ${brand.name}:`, err)
     }
 
-    // Polite delay between brands to avoid rate limiting
-    await sleep(DELAY_MS)
+    console.log(`[massScrape] Progress — added: ${totalAdded}, skipped: ${totalSkipped}`)
+
+    if (i + BATCH_SIZE < BRANDS.length) {
+      await sleep(DELAY_MS)
+    }
   }
 
-  console.log(`\n[massScrape] ✓ Done — ${totalAdded} ads added, ${totalSkipped} duplicates skipped`)
-  await prisma.$disconnect()
-  process.exit(0)
+  console.log(`\n[massScrape] ✓ DONE`)
+  console.log(`[massScrape] Brands with ads: ${totalBrands}/${BRANDS.length}`)
+  console.log(`[massScrape] Total ads added: ${totalAdded}`)
+  console.log(`[massScrape] Skipped (duplicates): ${totalSkipped}`)
+  console.log(`\n[massScrape] Switch Railway Start Command back to adsCron.ts`)
 }
 
-main().catch(err => {
-  console.error('[massScrape] Fatal:', err)
-  process.exit(1)
-})
+main()
+  .catch((err) => {
+    console.error('[massScrape] Fatal error:', err)
+    process.exit(1)
+  })
+  .finally(() => prisma.$disconnect())
